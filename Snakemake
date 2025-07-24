@@ -232,3 +232,35 @@ rule report:
         '{plant}/report.pdf'
     shell:
         """touch {output}""" 
+
+
+rule init_conda:
+    input:
+        ".envs_samtools",
+        ".envs_salmon",
+        ".envs_fastp",
+        ".envs_gffread"
+    output:
+        ".conda"
+    shell: """touch {output}"""
+
+rule init_salmon:
+    output: ".envs_salmon"
+    conda: "envs/salmon.yaml"
+    shell: """salmon --version > {output}"""
+
+rule init_fastp:
+    output: ".envs_fastp"
+    conda: "envs/fastp.yaml"
+    shell: """fastp --version > {output}"""
+
+rule init_gffread:
+    output: ".envs_gffread"
+    conda: "envs/gffread.yaml"
+    shell: """gffread 2> {output} || echo"""
+
+rule init_samtools:
+    output: ".envs_samtools"
+    conda: "envs/samtools.yaml"
+    shell: """samtools --version > {output}"""
+
