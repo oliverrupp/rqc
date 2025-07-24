@@ -61,7 +61,12 @@ rule index_full:
     output:
         "{plant}/results/index/salmon/index.complete"
     threads:
-        4
+        24
+    resources:
+        mem=16000
+        runtime=360
+        nodes=1
+        cpus_per_task=24
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check index -p {threads} \
@@ -77,7 +82,12 @@ rule index_small:
     output:
         "{plant}/results/index/salmon_{ref}/index.complete"
     threads:
-        4
+        8
+    resources:
+        mem=16000
+        runtime=360
+        nodes=1
+        cpus_per_task=8
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check index -p {threads} \
@@ -231,7 +241,7 @@ rule report:
     output:
         report='{plant}/report.pdf'
     conda: "envs/R.yaml"
-    params: reads=10000
+    params: reads=100000
     script: "scripts/rup2.R"
 
 
