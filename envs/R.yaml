@@ -1,0 +1,14 @@
+name: R
+channels:
+ - conda-forge
+ - bioconda
+dependencies:
+ - r-getopt
+ - r-gtools
+ - r-ggplot2
+ - r-reshape2
+ - r-pheatmap
+ - r-rjson
+ - bioconductor-tximeta
+ - bioconductor-deseq2
+ - bioconductor-pcatools

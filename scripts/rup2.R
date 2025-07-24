@@ -1,3 +1,5 @@
+library(tidyr)
+library(dplyr)
 library(ggplot2)
 library(reshape2)
 library(pheatmap)
@@ -40,11 +42,20 @@ if(!is.null(opt$correlation)) min_sample_correlation <- opt$correlation
 
 ### setwd("~/Projects/rnaseq_ranomics/TT/")
 
+outfile="report.pdf"
+
+if(!is.null(snakemake)) {
+  setwd(dirname(snakemake@output[["report"]]))
+  min_assigned_read_count = snakemake@params[["reads"]]
+  outfile = basename(snakemake@output[["report"]])
+}
+
 sample_info <- read.table("reference/samples.tsv", header=F, sep="\t", row.names = 2)
 colnames(sample_info) <- "condition"
 
 samples <- row.names(sample_info)
 
+deg_res <- data.frame(sample=character(), quantil=character(), median=integer())
 results <- data.frame(sample=character(), status=character(), reference=character(), reads=integer())
 
 for(sample in samples) {
@@ -83,7 +94,32 @@ for(sample in samples) {
     stats$reference <- "rRNA"
     results <- rbind(results, stats)
   }
+
+  jfile <- paste0("results/salmon_quantiles/", sample, "/quant.sf")
+
+  if(file.exists(jfile)) {
+    dc <- read.table(jfile, header=T, sep="\t", row.names=1)
+    dc$quantil = gsub(".*_(q[0-9]+)$", "\\1", row.names(dc))
+    dc$ids = gsub("(.*)_(q[0-9]+)$", "\\1", row.names(dc))
+
+    dc <- dc[,c("ids", "quantil", "NumReads")]
+
+    dcd <- as.data.frame(pivot_wider(dc, names_from = quantil, values_from = NumReads))
+    row.names(dcd) = dcd$ids
+
+    dc = dc[dc$ids %in% rownames(dcd)[rowSums(dcd[,2:ncol(dcd)]) > 0],]
+
+    dc$pct = dc$NumReads / rowSums(dcd[dc$ids,2:ncol(dcd)]) * 100
+
+    median <- group_by(dc, quantil) %>% summarise(median=median(pct))
+
+    deg_res = rbind(deg_res, data.frame(quantil=median$quantil, median=median$median, sample = sample))
+  }
 }
+
+deg_res$quantil = factor(deg_res$quantil, levels=paste0("q", 1:10))
+
+deg_plot <- ggplot(deg_res, aes(x=quantil, y=median, group=sample, col=sample)) + geom_line()
 
 
 results$status = factor(results$status, levels=rev(c("Assigned", "NoFeature", "Unmapped",
@@ -262,13 +298,14 @@ sample_dist_filtered <- as.matrix(dist(t(cor_data_filtered)))
 library(PCAtools)
 
 
-pdf("RNAseqQC.pdf", w=18, h=12)
+pdf(outfile, w=18, h=12)
 
 theme_set(theme_bw())
 
 print(reads_plot)
 print(gene_coverage_plot)
 
+print(deg_plot)
 
 
 pheatmap(sample_cor, fontsize = 12, annotation_col=a, main="Sample Correlation Heatmap")

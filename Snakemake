@@ -229,9 +229,10 @@ rule report:
         expand('{plant}/results/salmon_{ref}/{sample}/quant.sf',
                filtered_product, plant=PLANTS, sample=SAMPLES, ref=['rrna', 'quantiles'])
     output:
-        '{plant}/report.pdf'
-    shell:
-        """touch {output}""" 
+        report='{plant}/report.pdf'
+    conda: "envs/R.yaml"
+    params: reads=10000
+    script: "scripts/rup2.R"
 
 
 rule init_conda:
