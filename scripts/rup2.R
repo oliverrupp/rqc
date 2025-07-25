@@ -1,15 +1,15 @@
 library(tidyr)
 library(dplyr)
+library(tidyverse)
 library(ggplot2)
 library(reshape2)
 library(pheatmap)
+library(ComplexHeatmap)
 library(rjson)
 library(tximeta)
 library(BiocFileCache)
 library(DESeq2)
 library(gtools)
-#library(maketools)
-#library(this.path)
 library(getopt)
 
 min_assigned_read_count <- 10e6
@@ -30,21 +30,11 @@ if(!is.null(opt$datafolder)) setwd(opt$datafolder)
 if(!is.null(opt$reads)) min_assigned_read_count <- opt$reads
 if(!is.null(opt$correlation)) min_sample_correlation <- opt$correlation
 
-# if(!is.null(opt$make))  {
-#   Sys.setenv(MAKEFLAGS = "-j1")
-#   CPU=1
-#   script_path <- this.dir()
-#
-#   if(!is.null(opt$threads)) CPU <- opt$threads
-#   if(!is.null(opt$jobs)) Sys.setenv(MAKEFLAGS = paste0("-j",opt$jobs))
-#   make(c("all", paste0("CPU=",CPU)), makefile = file.path(script_path, "Makefile"))
-# }
-
-### setwd("~/Projects/rnaseq_ranomics/TT/")
+setwd("~/Projects/rnaseq_ranomics/CR")
 
 outfile="report.pdf"
 
-if(!is.null(snakemake)) {
+if(exists("snakemake")) {
   setwd(dirname(snakemake@output[["report"]]))
   min_assigned_read_count = snakemake@params[["reads"]]
   outfile = basename(snakemake@output[["report"]])
@@ -53,12 +43,17 @@ if(!is.null(snakemake)) {
 sample_info <- read.table("reference/samples.tsv", header=F, sep="\t", row.names = 2)
 colnames(sample_info) <- "condition"
 
+sname = mixedsort(unique(sample_info$condition))
+sample_colors = rainbow(length(sname))
+names(sample_colors) = sname
+
 samples <- row.names(sample_info)
 
-deg_res <- data.frame(sample=character(), quantil=character(), median=integer())
+deg_res <- data.frame(sample=character(), quantile=character(), pct=integer())
 results <- data.frame(sample=character(), status=character(), reference=character(), reads=integer())
 
 for(sample in samples) {
+  message(sample)
   jfile <- paste0("results/trimmed/",sample,".json")
   jdat <- fromJSON(file = jfile)
 
@@ -99,27 +94,29 @@ for(sample in samples) {
 
   if(file.exists(jfile)) {
     dc <- read.table(jfile, header=T, sep="\t", row.names=1)
-    dc$quantil = gsub(".*_(q[0-9]+)$", "\\1", row.names(dc))
+    dc$quantile = gsub(".*_(q[0-9]+)$", "\\1", row.names(dc))
     dc$ids = gsub("(.*)_(q[0-9]+)$", "\\1", row.names(dc))
 
-    dc <- dc[,c("ids", "quantil", "NumReads")]
+    dc <- dc[,c("ids", "quantile", "NumReads")]
 
-    dcd <- as.data.frame(pivot_wider(dc, names_from = quantil, values_from = NumReads))
-    row.names(dcd) = dcd$ids
+    dcd <- as.data.frame(pivot_wider(dc, names_from = quantile, values_from = NumReads))
+    dcd <- column_to_rownames(dcd, var="ids")
 
-    dc = dc[dc$ids %in% rownames(dcd)[rowSums(dcd[,2:ncol(dcd)]) > 0],]
+    dcd <- dcd[rowSums(dcd) > 0,]
 
-    dc$pct = dc$NumReads / rowSums(dcd[dc$ids,2:ncol(dcd)]) * 100
+    dcd <- dcd / rowSums(dcd) * 100
 
-    median <- group_by(dc, quantil) %>% summarise(median=median(pct))
+    pct = colSums(dcd) / sum(colSums(dcd)) * 100
 
-    deg_res = rbind(deg_res, data.frame(quantil=median$quantil, median=median$median, sample = sample))
+    deg_res <- rbind(deg_res, data.frame(sample=sample, quantile=names(pct), pct = pct))
   }
 }
 
-deg_res$quantil = factor(deg_res$quantil, levels=paste0("q", 1:10))
+deg_tmp = pivot_wider(deg_res, names_from = quantile, values_from = pct)
 
-deg_plot <- ggplot(deg_res, aes(x=quantil, y=median, group=sample, col=sample)) + geom_line()
+deg_matrix = as.matrix(column_to_rownames(deg_tmp, var="sample"))
+deg_matrix = deg_matrix[,paste0("q", 1:10)]
+
 
 
 results$status = factor(results$status, levels=rev(c("Assigned", "NoFeature", "Unmapped",
@@ -127,6 +124,8 @@ results$status = factor(results$status, levels=rev(c("Assigned", "NoFeature", "U
 reads_plot <- ggplot(results, aes(x=sample, y=reads, fill=status)) + geom_bar(stat="identity") +
   theme(text = element_text(size = 18)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 0)) + facet_wrap(~reference, ncol=1)
+
+
 
 sample_info$files = paste0("results/salmon/", rownames(sample_info), "/quant.sf")
 sample_info$names = rownames(sample_info)
@@ -164,10 +163,8 @@ df = data.frame("G0"=colSums(gene_count_matrix == 0),
 
 df$Replicate = rownames(df)
 df$Sample = sample_info[df$Replicate,]$condition
+
 dfm = melt(df, id.vars = c("Replicate", "Sample"))
-head(dfm)
-
-
 for (sample_name in unique(sample_info$condition)) {
   message(sample_name)
   max_counts <- apply(gene_count_matrix[,sample_info[sample_info$condition == sample_name,]$names], 1, max, na.rm=TRUE)
@@ -177,8 +174,6 @@ for (sample_name in unique(sample_info$condition)) {
   dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G100", value=sum(max_counts >= 100 & max_counts < 1000)))
   dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G1000", value=sum(max_counts >= 1000)))
 }
-
-
 
 dfm$variable = as.character(dfm$variable)
 
@@ -190,43 +185,26 @@ dfm[dfm$variable == "G1000",]$variable = "more than 1000 reads"
 
 dfm$variable = factor(dfm$variable, levels=c("No reads", "1 to 10 reads", "10 to 100 reads", "100 to 1000 reads", "more than 1000 reads"))
 
-dfm$Replicate = factor(dfm$Replicate, levels=c(mixedsort(unique(sample_info$name)), mixedsort(unique(sample_info$condition))))
+dfm$Replicate = as.character(dfm$Replicate)
+for(s in unique(dfm$Sample)) {
+  dfm[dfm$Sample == s,]$Replicate = gsub(paste0(s, "_"), "", dfm[dfm$Sample == s,]$Replicate)
+  dfm[dfm$Sample == s,]$Replicate = gsub(paste0(s, "-"), "", dfm[dfm$Sample == s,]$Replicate)
+  dfm[dfm$Sample == s,]$Replicate = gsub(s, "S", dfm[dfm$Sample == s,]$Replicate)
+}
+
+dfm$Replicate = factor(dfm$Replicate, levels=c(mixedsort(unique(dfm$Replicate)), mixedsort(unique(dfm$Sample))))
 
 gene_coverage_plot <- ggplot(dfm, aes(x=Replicate, y=value, fill=variable)) +
   geom_bar(stat="identity") +
   ylab("Number of Genes") + xlab("Samples") +
   ggtitle("Number of Reads per Gene") +
   guides(fill=guide_legend(title="Number of assigned reads")) +
-  theme(text = element_text(size = 18)) +
+  theme(text = element_text(size = 10)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 0)) +
   facet_wrap(~Sample, scale="free_x")
 
 sample_cor <- cor(cor_data, method='pearson', use='pairwise.complete.obs')
 sample_dist <- as.matrix(dist(t(cor_data)))
-
-a = data.frame(samples = sample_info[colnames(cor_data),1])
-row.names(a) = colnames(cor_data)
-
-#
-# pca <- prcomp(cor_data, center = FALSE, scale. = FALSE)
-# pca_data = as.data.frame(pca$rotation)
-# pca_data$Samples = sample_info[row.names(pca_data),1]
-#
-# summ_pca <- summary(pca)
-#
-# pca_variance = summ_pca$importance[2,] * 100
-#
-# use_vst = T
-# pca_plot1 <- ggplot(pca_data, aes(x = PC1, y = PC2, col=Samples)) + geom_point(size=4) +
-#   xlab(sprintf("PCA1 [%.2f%% variance]", pca_variance[1])) +
-#   ylab(sprintf("PCA2 [%.2f%% variance]", pca_variance[2])) +
-#   ggtitle(paste("PCA of", ifelse(use_vst, "VST", "log2(TPM)"), "transformed counts", sep=" ")) +
-#   theme(text = element_text(size = 18))
-# pca_plot2 <- ggplot(pca_data, aes(x = PC3, y = PC4, col=Samples)) + geom_point(size=4) +
-#   xlab(sprintf("PCA3 [%.2f%% variance]", pca_variance[3])) +
-#   ylab(sprintf("PCA4 [%.2f%% variance]", pca_variance[4])) +
-#   ggtitle(paste("PCA of", ifelse(use_vst, "VST", "log2(TPM)"), "transformed counts", sep=" ")) +
-#   theme(text = element_text(size = 18))
 
 
 
@@ -287,27 +265,37 @@ theme_set(theme_bw())
 print(reads_plot)
 print(gene_coverage_plot)
 
-print(deg_plot)
+pheatmap(deg_matrix, cluster_rows = T, cluster_cols = F,
+         treeheight_row=0, fontsize = 8, border = F,
+         heatmap_legend_param=list(title="coverage (%)"))
 
+detach("package:ComplexHeatmap", unload=TRUE)
 
-pheatmap(sample_cor, fontsize = 12, annotation_col=a, main="Sample Correlation Heatmap")
-pheatmap(sample_dist, fontsize = 12, annotation_col=a, main="Sample Distance Heatmap")
+a = data.frame(samples = sample_info[colnames(cor_data),1])
+row.names(a) = colnames(cor_data)
+
+pheatmap(sample_cor, fontsize = 10, annotation_col=a, main="Sample Correlation Heatmap")
+pheatmap(sample_dist, fontsize = 10, annotation_col=a, main="Sample Distance Heatmap")
 
 PCA = pca(cor_data, metadata = colData(se))
 biplot(PCA, x = "PC2", y = "PC1", colby="condition")
-#pairsplot(PCA, colby="condition")
-#screeplot(PCA, axisLabSize = 18, titleLabSize = 22)
 
 if(plot_rem) { print(removed_plot) }
 
 if(!is.null(sample_cor_filtered)) {
-pheatmap(sample_cor_filtered, fontsize = 12, annotation_col=a, main="Sample Correlation Heatmap")
-pheatmap(sample_dist_filtered, fontsize = 12, annotation_col=a, main="Sample Distance Heatmap")
+  pheatmap(sample_cor_filtered, fontsize = 10,
+           annotation_col=a, main="Sample Correlation Heatmap")
 
-PCA = pca(cor_data_filtered, metadata = colData(se)[! rownames(colData(se)) %in% low_q_samples,])
-biplot(PCA, x = "PC2", y = "PC1", colby="condition")
-pairsplot(PCA, colby="condition")
-screeplot(PCA, axisLabSize = 18, titleLabSize = 22)
+  pheatmap(sample_dist_filtered, fontsize = 10, annotation_col=a, main="Sample Distance Heatmap")
+
+  PCA = pca(cor_data_filtered, metadata = colData(se)[! rownames(colData(se)) %in% low_q_samples,])
+  bip = biplot(PCA, x = "PC2", y = "PC1", colby="condition")
+  pair = pairsplot(PCA, colby="condition")
+  scree = screeplot(PCA, axisLabSize = 18, titleLabSize = 22)
+
+  print(bip)
+  print(pair)
+  print(scree)
 }
 
 dev.off()
