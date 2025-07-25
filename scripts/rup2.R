@@ -270,30 +270,12 @@ if(length(low_q_samples) > 0) {
 
 message(low_q_samples)
 
+if(length(low_q_samples) < ncol(cor_data)) {
 cor_data_filtered = cor_data[,!colnames(cor_data) %in% low_q_samples]
 
 sample_cor_filtered <- cor(cor_data_filtered, method='pearson', use='pairwise.complete.obs')
 sample_dist_filtered <- as.matrix(dist(t(cor_data_filtered)))
-
-
-# pca <- prcomp(cor_data_filtered, center = FALSE, scale. = FALSE)
-# pca_data = as.data.frame(pca$rotation)
-# pca_data$Samples = sample_info[row.names(pca_data),1]
-#
-# summ_pca <- summary(pca)
-# pca_variance = summ_pca$importance[2,] * 100
-#
-# use_vst = T
-# pca_plot1_filtered <- ggplot(pca_data, aes(x = PC1, y = PC2, col=Samples)) + geom_point(size=4) +
-#   xlab(sprintf("PCA1 [%.2f%% variance]", pca_variance[1])) +
-#   ylab(sprintf("PCA2 [%.2f%% variance]", pca_variance[2])) +
-#   ggtitle(paste("PCA of", ifelse(use_vst, "VST", "log2(TPM)"), "transformed counts", sep=" ")) +
-#   theme(text = element_text(size = 18))
-# pca_plot2_filtered <- ggplot(pca_data, aes(x = PC3, y = PC4, col=Samples)) + geom_point(size=4) +
-#   xlab(sprintf("PCA3 [%.2f%% variance]", pca_variance[3])) +
-#   ylab(sprintf("PCA4 [%.2f%% variance]", pca_variance[4])) +
-#   ggtitle(paste("PCA of", ifelse(use_vst, "VST", "log2(TPM)"), "transformed counts", sep=" ")) +
-#   theme(text = element_text(size = 18))
+}
 
 library(PCAtools)
 
@@ -318,6 +300,7 @@ biplot(PCA, x = "PC2", y = "PC1", colby="condition")
 
 if(plot_rem) { print(removed_plot) }
 
+if(!is.null(sample_cor_filtered)) {
 pheatmap(sample_cor_filtered, fontsize = 12, annotation_col=a, main="Sample Correlation Heatmap")
 pheatmap(sample_dist_filtered, fontsize = 12, annotation_col=a, main="Sample Distance Heatmap")
 
@@ -325,6 +308,7 @@ PCA = pca(cor_data_filtered, metadata = colData(se)[! rownames(colData(se)) %in%
 biplot(PCA, x = "PC2", y = "PC1", colby="condition")
 pairsplot(PCA, colby="condition")
 screeplot(PCA, axisLabSize = 18, titleLabSize = 22)
+}
 
 dev.off()
 
