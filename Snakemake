@@ -19,7 +19,7 @@ filtered_product = filter_combinator(product)
 
 rule all:
     input:
-        expand('{plant}/report.pdf', plant=PLANTS)
+        expand('{plant}/{plant}.report.pdf', plant=PLANTS)
 
 
 rule index:
@@ -246,7 +246,7 @@ rule report:
         expand('{plant}/results/salmon_{ref}/{sample}/quant.sf',
                filtered_product, plant=PLANTS, sample=SAMPLES, ref=['rrna', 'quantiles'])
     output:
-        report='{plant}/report.pdf'
+        report='{plant}/{plant}.report.pdf'
     conda: "envs/R.yaml"
     params: reads=100000
     script: "scripts/rup2.R"
@@ -257,7 +257,8 @@ rule init_conda:
         ".envs_samtools",
         ".envs_salmon",
         ".envs_fastp",
-        ".envs_gffread"
+        ".envs_gffread",
+        ".envs_R"
     output:
         ".conda"
     shell: """touch {output}"""
@@ -281,4 +282,9 @@ rule init_samtools:
     output: ".envs_samtools"
     conda: "envs/samtools.yaml"
     shell: """samtools --version > {output}"""
+
+rule init_R:
+    output: ".envs_R"
+    conda: "envs/R.yaml"
+    shell: """R --version > {output}"""
 

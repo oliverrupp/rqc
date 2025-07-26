@@ -12,3 +12,5 @@ dependencies:
  - bioconductor-tximeta
  - bioconductor-deseq2
  - bioconductor-pcatools
+ - r-tidyverse
+ - bioconductor-complexheatmap

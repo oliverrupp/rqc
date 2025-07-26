@@ -30,7 +30,7 @@ if(!is.null(opt$datafolder)) setwd(opt$datafolder)
 if(!is.null(opt$reads)) min_assigned_read_count <- opt$reads
 if(!is.null(opt$correlation)) min_sample_correlation <- opt$correlation
 
-setwd("~/Projects/rnaseq_ranomics/CR")
+### setwd("~/Projects/rnaseq_ranomics/CR")
 
 outfile="report.pdf"
 
@@ -46,6 +46,46 @@ colnames(sample_info) <- "condition"
 sname = mixedsort(unique(sample_info$condition))
 sample_colors = rainbow(length(sname))
 names(sample_colors) = sname
+
+
+
+
+
+
+sample_info$files = paste0("results/salmon/", rownames(sample_info), "/quant.sf")
+sample_info$names = rownames(sample_info)
+
+bfcDir <- file.path(getwd(),"results/index/BFC")
+indexDir <- file.path(getwd(),"results/index/salmon")
+fastaPath <- file.path(getwd(),"reference/genome.fa")
+gtfPath <- file.path(getwd(),"reference/annotation.gtf")
+
+#bfcloc <- getTximetaBFC()
+#message(bfcloc)
+#unlink(paste0(bfcloc,"/*"))
+
+setTximetaBFC(bfcDir)
+makeLinkedTxome(indexDir=indexDir,
+                source="denovo",
+                organism=getwd(),
+                release="1",
+                genome=getwd(),
+                fasta=fastaPath,
+                gtf=gtfPath)
+
+se <- tximeta(sample_info)
+gse <- summarizeToGene(se)
+
+TPM = assay(gse, "abundance")
+gene_count_matrix = assay(gse, "counts")
+dds <- DESeqDataSet(gse, design = ~condition)
+vsd <- vst(dds, blind = FALSE)
+cor_data = assay(vsd)
+#cor_data = log2(TPM+1)
+
+
+
+
 
 samples <- row.names(sample_info)
 
@@ -127,32 +167,6 @@ reads_plot <- ggplot(results, aes(x=sample, y=reads, fill=status)) + geom_bar(st
 
 
 
-sample_info$files = paste0("results/salmon/", rownames(sample_info), "/quant.sf")
-sample_info$names = rownames(sample_info)
-
-indexDir <- file.path(getwd(),"results/index/salmon")
-fastaPath <- file.path(getwd(),"reference/genome.fa")
-gtfPath <- file.path(getwd(),"reference/annotation.gtf")
-
-makeLinkedTxome(indexDir=indexDir,
-                source="denovo",
-                organism=getwd(),
-                release="1",
-                genome=getwd(),
-                fasta=fastaPath,
-                gtf=gtfPath)
-
-se <- tximeta(sample_info)
-gse <- summarizeToGene(se)
-
-TPM = assay(gse, "abundance")
-gene_count_matrix = assay(gse, "counts")
-dds <- DESeqDataSet(gse, design = ~condition)
-vsd <- vst(dds, blind = FALSE)
-cor_data = assay(vsd)
-#cor_data = log2(TPM+1)
-
-
 
 
 df = data.frame("G0"=colSums(gene_count_matrix == 0),
@@ -167,12 +181,15 @@ df$Sample = sample_info[df$Replicate,]$condition
 dfm = melt(df, id.vars = c("Replicate", "Sample"))
 for (sample_name in unique(sample_info$condition)) {
   message(sample_name)
-  max_counts <- apply(gene_count_matrix[,sample_info[sample_info$condition == sample_name,]$names], 1, max, na.rm=TRUE)
-  dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G0", value=sum(max_counts == 0)))
-  dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G1", value=sum(max_counts >= 1 & max_counts < 10)))
-  dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G10", value=sum(max_counts >= 10 & max_counts < 100)))
-  dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G100", value=sum(max_counts >= 100 & max_counts < 1000)))
-  dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G1000", value=sum(max_counts >= 1000)))
+  if(sum(sample_info$condition == sample_name) > 1) {
+  	max_counts <- apply(gene_count_matrix[,sample_info[sample_info$condition == sample_name,]$names], 1, max, na.rm=TRUE)
+
+  	dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G0", value=sum(max_counts == 0)))
+  	dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G1", value=sum(max_counts >= 1 & max_counts < 10)))
+  	dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G10", value=sum(max_counts >= 10 & max_counts < 100)))
+  	dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G100", value=sum(max_counts >= 100 & max_counts < 1000)))
+  	dfm <- rbind(dfm, list(Replicate = sample_name, Sample = sample_name, variable="G1000", value=sum(max_counts >= 1000)))
+  }
 }
 
 dfm$variable = as.character(dfm$variable)
@@ -216,6 +233,7 @@ sample_cor_filtered <- sample_cor[! rownames(sample_cor) %in% remove_by_reads, !
 for(sample_name in unique(sample_info$condition)) {
   message(sample_name)
 
+  if(sum(sample_info$condition == sample_name) > 2) {
   sample_replicates <- sample_info[sample_info$condition == sample_name,]$names
   sample_replicates <- sample_replicates[! sample_replicates %in% remove_by_reads]
 
@@ -227,6 +245,7 @@ for(sample_name in unique(sample_info$condition)) {
       remove_by_correlation <- c(remove_by_correlation, low_ids)
     }
   }
+}
 }
 
 low_q_samples <- c(remove_by_reads, remove_by_correlation)
@@ -302,6 +321,4 @@ dev.off()
 
 
 
-bfcloc <- getTximetaBFC()
-message(bfcloc)
-unlink(paste0(bfcloc,"/*"))
+
