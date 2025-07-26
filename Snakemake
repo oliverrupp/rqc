@@ -142,8 +142,24 @@ rule rrna:
     shell: """
            gffread {input.annotation} -g {input.genome} -w {output}
            """
-  
 
+
+rule find_rrnas:
+    input: "{plant}/reference/genome.fa"
+    output: "{plant}/reference/barrnap.out"
+    conda: "envs/barrnap.yaml"
+    threads: 8
+    shell: """barrnap --kingdom euk --threads {threads} {input} > {output}"""
+
+
+           
+rule rrna_gtf:
+    input: "{plant}/reference/barrnap.out"
+    output: "{plant}/reference/rRNA.gtf"
+    script: "scripts/barrnap2gtf.py"
+
+
+            
 rule trim_pe:
     input:
         r1="{plant}/reads/{sample}_1.fq.gz",
