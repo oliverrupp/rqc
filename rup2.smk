@@ -3,28 +3,26 @@ from itertools import product
 
 
 (PLANTS, )=glob_wildcards('{plants}/reference/genome.fa')
-(PLANTS2, SAMPLESPE, PS, )=glob_wildcards('{plants}/reads/{samples}_{s}.fq.gz')
-
-def filter_combinator(combinator):
-    def filtered_combinator(*args, **kwargs):
-        print("filter files...")
-        for wc_comb in combinator(*args, **kwargs):
-            filetocheck_1 = "%s/reads/%s_1.fq.gz" % (wc_comb[0][1], wc_comb[1][1])
-            filetocheck_2 = "%s/reads/%s_2.fq.gz" % (wc_comb[0][1], wc_comb[1][1])
-            filetocheck_s = "%s/reads/%s_s.fq.gz" % (wc_comb[0][1], wc_comb[1][1])
-            
-            if(os.path.isfile(filetocheck_1) and os.path.isfile(filetocheck_2)):
-                yield wc_comb
-            if(os.path.isfile(filetocheck_s)):
-                yield wc_comb
-
-    return filtered_combinator
-
-filtered_product = filter_combinator(product)
+(PLANTS2, SAMPLES, PE, )=glob_wildcards('{plants}/reads/{samples}_{s}.fq.gz')
 
 
 
-rule all:
+def get_inputs(plant, type):
+    for p in zip(PLANTS2, SAMPLES):
+            filetocheck_1 = "%s/reads/%s_1.fq.gz" % (p[0], p[1])
+            filetocheck_2 = "%s/reads/%s_2.fq.gz" % (p[0], p[1])
+            filetocheck_s = "%s/reads/%s_s.fq.gz" % (p[0], p[1])
+
+            if(p[0] == plant and ((os.path.isfile(filetocheck_1) and os.path.isfile(filetocheck_2)) or os.path.isfile(filetocheck_s))):
+                match type:
+                    case "trimmed":
+                        yield("{plant}/results/trimmed/{sample}.json").format(plant=p[0], sample=p[1])
+                    case _:
+                        yield("{plant}/results/{type}/{sample}/quant.sf").format(plant=p[0], type=type, sample=p[1])
+
+
+
+rule report:
     input:
         expand('{plant}/{plant}.report.pdf', plant=PLANTS)
 
@@ -40,30 +38,25 @@ rule index:
 
 rule trim:
     input:
-        expand('{plant}/results/trimmed/{sample}.json',
-               filtered_product, plant=PLANTS, sample=SAMPLESPE)
-           
+        expand('{plant}/results/trimmed/{sample}.json', zip, plant=PLANTS2, sample=SAMPLES)
+               
 
 
 rule quant:
     input:
-        expand('{plant}/results/salmon/{sample}/quant.sf',
-               filtered_product, plant=PLANTS, sample=SAMPLESPE)
-    output:
-        '{plant}/results/salmon/.done'
-    shell:
-        "touch {output}"
+        expand('{plant}/results/salmon/{sample}/quant.sf', zip, plant=PLANTS2, sample=SAMPLES)
 
 
 
-rule quant_small:
+rule quant_rrna:
     input:
-        expand('{plant}/esults/salmon_{ref}/{sample}/quant.sf',
-               filtered_product, plant=PLANTS, sample=SAMPLESPE, ref=['rrna', 'quantiles'])
-    output:
-        '{plant}/results/salmon_{ref}/.done'
-    shell:
-        "touch {output}"
+        expand('{plant}/results/salmon_rrna/{sample}/quant.sf', zip, plant=PLANTS2, sample=SAMPLES)
+
+
+
+rule quant_quantiles:
+    input:
+        expand('{plant}/results/salmon_quantiles/{sample}/quant.sf', zip, plant=PLANTS2, sample=SAMPLES)
 
 
 
@@ -358,15 +351,13 @@ rule fai:
 
 
 
-rule report:
+rule report_pdf:
     input:
         '{plant}/reference/samples.tsv',
-        expand('{plant}/results/trimmed/{sample}.json',
-               filtered_product, plant=PLANTS, sample=SAMPLESPE),
-        expand('{plant}/results/salmon/{sample}/quant.sf',
-               filtered_product, plant=PLANTS, sample=SAMPLESPE),
-        expand('{plant}/results/salmon_{ref}/{sample}/quant.sf',
-               filtered_product, plant=PLANTS, sample=SAMPLESPE, ref=['rrna', 'quantiles'])
+        lambda wildcards: get_inputs(wildcards.plant, "trimmed"),
+        lambda wildcards: get_inputs(wildcards.plant, "salmon"),
+        lambda wildcards: get_inputs(wildcards.plant, "salmon_rrna"),
+        lambda wildcards: get_inputs(wildcards.plant, "salmon_quantiles")
     output:
         report='{plant}/{plant}.report.pdf'
     conda: "envs/R.yaml"
