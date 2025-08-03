@@ -40,7 +40,6 @@ if(!is.null(opt$correlation)) min_sample_correlation <- opt$correlation
 outfile="report.pdf"
 
 if(exists("snakemake")) {
-
   message(snakemake@output[["report"]])
 
   setwd(dirname(snakemake@output[["report"]]))
@@ -215,7 +214,7 @@ for(s in unique(dfm$Sample)) {
 
 dfm$Replicate = factor(dfm$Replicate, levels=c(mixedsort(unique(dfm$Replicate)), mixedsort(unique(dfm$Sample))))
 
-gcp_colors = c("#a0a0a0", "#F8766D", "#C49A00", "#00BA38")
+gcp_colors = c("#e0e0e0", "#faa39d", "#dbc160", "#00BA38")
 names(gcp_colors) = levels(dfm$variable)
 
 gene_coverage_plot <- ggplot(dfm, aes(x=Replicate, y=value, fill=variable)) +
