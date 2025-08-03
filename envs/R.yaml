@@ -14,3 +14,5 @@ dependencies:
  - bioconductor-pcatools
  - r-tidyverse
  - bioconductor-complexheatmap
+ - r-moments
+ - r-xlsx
