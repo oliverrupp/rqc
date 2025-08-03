@@ -6,10 +6,10 @@
 
 report
 
- - slurm
+- slurm
 
 wrapper
 
 options
 
-single end
+- single end
