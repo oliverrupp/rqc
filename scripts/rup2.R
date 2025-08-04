@@ -115,14 +115,14 @@ for (sample in samples) {
   if (file.exists(jfile)) {
     jdat <- fromJSON(file = jfile)
 
-    stats <- data.frame(status = c("rRNA"),
-                        reads = c(jdat$num_mapped))
+    stats <- data.frame(status = "rRNA",
+                        reads = -1*jdat$num_mapped)
 
     stats$sample <- sample
     stats$reference <- "Gene"
     results <- rbind(results, stats)
-    selection <- results$status == "Unmapped" & results$sample == sample
-    results[selection, ]$reads <- results[selection, ]$reads  - jdat$num_mapped
+    #selection <- results$status == "Unmapped" & results$sample == sample
+    #results[selection, ]$reads <- results[selection, ]$reads  - jdat$num_mapped
   }
 }
 

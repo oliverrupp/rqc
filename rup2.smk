@@ -99,7 +99,7 @@ rule index_small:
     shell: """
            salmon --no-version-check index -p {threads} \
                   -i {wildcards.plant}/results/index/salmon_{wildcards.ref} \
-                  -t {input.t} --keepDuplicates && \
+                  -t {input.t} && \
            touch {output}
            """
 
@@ -278,7 +278,7 @@ rule salmon_pe_rrna:
            salmon --no-version-check quant -l A \
 	   	  -i {wildcards.plant}/results/index/salmon_rrna \
 		  -p {threads} \
-		  -o {wildcards.plant}/results/salmon_rrna/{wildcards.sample}\
+		  -o {wildcards.plant}/results/salmon_rrna/{wildcards.sample} \
 		  -1 {input.r1pe} -2 {input.r2pe}
            """
 
@@ -318,7 +318,7 @@ rule salmon_pe_quantiles:
            salmon --no-version-check quant -l A \
 	   	  -i {wildcards.plant}/results/index/salmon_quantiles \
 		  -p {threads} \
-		  -o {wildcards.plant}/results/salmon_quantiles/{wildcards.sample}\
+		  -o {wildcards.plant}/results/salmon_quantiles/{wildcards.sample} \
 		  -r {input.r1pe} {input.r2pe}
            """
 
@@ -337,7 +337,7 @@ rule salmon_se_quantiles:
            salmon --no-version-check quant -l A \
 	   	  -i {wildcards.plant}/results/index/salmon_quantiles \
 		  -p {threads} \
-		  -o {wildcards.plant}/results/salmon_quantiles/{wildcards.sample}\
+		  -o {wildcards.plant}/results/salmon_quantiles/{wildcards.sample} \
 		  -r {input.rse}
            """
 
