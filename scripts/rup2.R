@@ -89,12 +89,18 @@ for (sample in samples) {
   jfile <- paste0("results/trimmed/", sample, ".json")
   jdat <- fromJSON(file = jfile)
 
+  type <- jdat$summary$sequencing
+  div <- 1
+
+  if (regexpr("paired end", type) >= 0) {
+    div <- 2
+  }
   total_reads <- jdat$summary$before_filtering$total_reads
   stats <- data.frame(status = c("LowQuality", "Nreads", "TooShort", "TooLong"),
-                      reads = c(jdat$filtering_result$low_quality_reads / 2,
-                                jdat$filtering_result$too_many_N_reads / 2,
-                                jdat$filtering_result$too_short_reads / 2,
-                                jdat$filtering_result$too_long_reads / 2))
+                      reads = c(jdat$filtering_result$low_quality_reads / div,
+                                jdat$filtering_result$too_many_N_reads / div,
+                                jdat$filtering_result$too_short_reads / div,
+                                jdat$filtering_result$too_long_reads / div))
   stats$sample <- sample
   stats$reference <- "Gene"
   results <- rbind(results, stats)
