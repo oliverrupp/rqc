@@ -139,7 +139,7 @@ results$status <- factor(results$status,
                                         "TooLong", "LowQuality")))
 
 reads_plot <- ggplot(results, aes(x = sample, y = reads, fill = status)) +
-  #geom_hline(yintercept=c(30e6, 50e6)) +
+  geom_hline(yintercept=c(30e6, 50e6)) +
   geom_bar(stat = "identity") +
   theme(text = element_text(size = 18)) + ggtitle("Read count analysis") +
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
@@ -319,11 +319,45 @@ deg_tmp <- pivot_wider(deg_res, names_from = quantile, values_from = pct)
 deg_matrix <- as.matrix(column_to_rownames(deg_tmp, var = "sample"))
 deg_matrix <- deg_matrix[, paste0("q", 1:10)]
 
-ComplexHeatmap::pheatmap(deg_matrix, cluster_rows = TRUE, cluster_cols = FALSE,
-                         treeheight_row = 0, fontsize = 14, border = FALSE,
+skewness <- apply(deg_matrix, 1, function(data) {
+  mx <- max(data[2:9])
+  mi <- min(data[2:9])
+  px <- which(data == mx)
+  pi <- which(data == mi)
+  
+  (px - pi) * abs(mx-mi) / 10
+})
+
+skewclass <- rep("normal", length(skewness))
+names(skewclass) <- names(skewness)
+
+skewclass[names(skewness)[(skewness < -1)]] <- "light 3-prime"
+skewclass[names(skewness)[(skewness < -3)]] <- "strong 3-prime"
+skewclass[names(skewness)[(skewness >  1)]] <- "light 5-prime"
+skewclass[names(skewness)[(skewness >  3)]] <- "strong 5-prime"
+
+skewclass <- factor(skewclass, levels = c("strong 5-prime", "light 5-prime", 
+                                          "normal", 
+                                          "light 3-prime", "strong 3-prime"))
+
+ccols <- list(degradation = c("light 3-prime" = "#ff8080",
+                              "strong 3-prime" = "#800000",
+                              "normal" = "#00ff00",
+                              "light 5-prime" = "#8080ff",
+                              "strong 5-prime" = "#000080"))
+
+skewclass <- skewclass[rev(order(skewness))]
+
+cclass <- data.frame(degradation = skewclass)
+
+deg_matrix <- deg_matrix[rev(order(skewness)),]
+
+ComplexHeatmap::pheatmap(as.matrix(deg_matrix), cluster_rows = FALSE, cluster_cols = FALSE,
+                         annotation_row = cclass, annotation_colors = ccols, 
+                         treeheight_row = 0, fontsize = 12, border = FALSE,
+                         row_split = skewclass, 
                          heatmap_legend_param = list(title = "coverage (%)"),
                          main = "RNA degradation (gene body coverage)")
-
 
 ###############################################################################
 
@@ -337,7 +371,7 @@ a <- data.frame(samples = sample_info[colnames(cor_data), 1])
 row.names(a) <- colnames(cor_data)
 
 pheatmap::pheatmap(sample_cor,
-                   fontsize = 14,
+                   fontsize = 12,
                    annotation_col = a,
                    main = "Sample Correlation Heatmap of VST counts")
 
@@ -354,6 +388,7 @@ biplot(pca_res, x = "PC2", y = "PC1",
 
 ##################### FILTER SAMPLES ##########################################
 
+if (FALSE) {
 remove_by_reads <- results[results$status == "Assigned" &
                              results$reference == "Gene" &
                              results$reads <= min_assigned_read_count, ]$sample
@@ -402,6 +437,9 @@ if (length(low_q_samples) > 0) {
 
   print(removed_plot)
 }
+}
+
+low_q_samples <- c()
 
 ###############################################################################
 
