@@ -58,8 +58,7 @@ theme_set(theme_bw())
 ##################### SAMPLES #################################################
 
 sample_info <- read.table("reference/samples.tsv",
-                          header = FALSE, sep = "\t", row.names = 2)
-colnames(sample_info) <- "condition"
+                          header = TRUE, sep = "\t", row.names = 2)
 
 sname <- mixedsort(unique(sample_info$condition))
 sample_colors <- rainbow(length(sname))
@@ -304,7 +303,7 @@ for (sample in samples) {
 
     dcd <- dcd[rowSums(is.na(dcd)) == 0, ]
     dcd <- dcd[rowSums(dcd) > 0, ]
- 
+
     dcd <- dcd / rowSums(dcd) * 100
 
     pct <- colSums(dcd) / sum(colSums(dcd)) * 100
@@ -325,7 +324,7 @@ skewness <- apply(deg_matrix, 1, function(data) {
   mi <- min(data[2:9])
   px <- which(data == mx)
   pi <- which(data == mi)
-  
+
   (px - pi) * abs(mx-mi) / 10
 })
 
@@ -337,8 +336,8 @@ skewclass[names(skewness)[(skewness < -3)]] <- "strong 3-prime"
 skewclass[names(skewness)[(skewness >  1)]] <- "light 5-prime"
 skewclass[names(skewness)[(skewness >  3)]] <- "strong 5-prime"
 
-skewclass <- factor(skewclass, levels = c("strong 5-prime", "light 5-prime", 
-                                          "normal", 
+skewclass <- factor(skewclass, levels = c("strong 5-prime", "light 5-prime",
+                                          "normal",
                                           "light 3-prime", "strong 3-prime"))
 
 ccols <- list(degradation = c("light 3-prime" = "#ff8080",
@@ -354,9 +353,9 @@ cclass <- data.frame(degradation = skewclass)
 deg_matrix <- deg_matrix[rev(order(skewness)),]
 
 ComplexHeatmap::pheatmap(as.matrix(deg_matrix), cluster_rows = FALSE, cluster_cols = FALSE,
-                         annotation_row = cclass, annotation_colors = ccols, 
+                         annotation_row = cclass, annotation_colors = ccols,
                          treeheight_row = 0, fontsize = 12, border = FALSE,
-                         row_split = skewclass, 
+                         row_split = skewclass,
                          heatmap_legend_param = list(title = "coverage (%)"),
                          main = "RNA degradation (gene body coverage)")
 
@@ -380,6 +379,23 @@ pca_res <- pca(cor_data, metadata = colData(se))
 
 biplot(pca_res, x = "PC2", y = "PC1",
        colby = "condition", title = "PCA of VST counts")
+
+if (length(colnames(s)) > 1) {
+  pc <- pca_res$rotated[,1:5]
+  pc <- rownames_to_column(pc, "sample")
+
+  pcl <- pivot_longer(pc, cols=c(paste0("PC", 1:5)), names_to = "PC", values_to = "rot")
+
+  pcl <- cbind(pcl, s[pcl$sample,])
+
+  pcm <- pivot_longer(pcl, cols = colnames(s))
+
+  batch_pca_plot <- ggplot(pcm, aes(x = value, y = rot)) + geom_point() +
+    facet_grid(PC~name, scale = "free_x") + ggtitle("PC by batch") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+  print(batch_pca_plot)
+}
 
 ###############################################################################
 
