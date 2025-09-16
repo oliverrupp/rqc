@@ -18,7 +18,7 @@ suppressMessages(library(PCAtools))
 
 
 
-
+#### setwd("/vol/ranomics/rnaseq/QC/AC/")
 
 ##################### INIT ####################################################
 
@@ -302,8 +302,9 @@ for (sample in samples) {
                                      values_from = NumReads))
     dcd <- column_to_rownames(dcd, var = "ids")
 
+    dcd <- dcd[rowSums(is.na(dcd)) == 0, ]
     dcd <- dcd[rowSums(dcd) > 0, ]
-
+ 
     dcd <- dcd / rowSums(dcd) * 100
 
     pct <- colSums(dcd) / sum(colSums(dcd)) * 100

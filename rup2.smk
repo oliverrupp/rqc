@@ -17,6 +17,8 @@ def get_inputs(plant, type):
                 match type:
                     case "trimmed":
                         yield("{plant}/results/trimmed/{sample}.json").format(plant=p[0], sample=p[1])
+                    case "bam":
+                        yield("{plant}/results/bam/{sample}/STARAligned.sorted.bam").format(plant=p[0], sample=p[1])
                     case _:
                         yield("{plant}/results/{type}/{sample}/quant.sf").format(plant=p[0], type=type, sample=p[1])
 
@@ -79,6 +81,85 @@ rule index_full:
            -i {wildcards.plant}/results/index/salmon \
                   -t {input.t}  --decoys {input.decoys} --keepDuplicates && \
            touch {output}
+           """
+
+
+rule star_map:
+    input: 
+        r1pe="{plant}/results/trimmed/{sample}_R1.fastq.gz",
+        r2pe="{plant}/results/trimmed/{sample}_R2.fastq.gz",
+        index="{plant}/results/index/STAR"
+    output:
+        "{plant}/results/bam/{sample}/STARAligned.out.bam"
+    threads: 24
+    resources:
+        mem_mb=96000,
+        runtime=360,
+        nodes=1,
+        cpus_per_task=24
+    conda: "envs/STAR.yaml"
+    shell: """
+           STAR --genomeDir {input.index} \
+                --readFilesIn {input.r1pe} {input.r2pe} \
+                --outSAMunmapped Within \
+                --outFilterType BySJout \
+                --twopassMode Basic \
+                --outSAMattributes NH HI AS NM MD \
+                --outFilterMultimapNmax 20 \
+                --outFilterMismatchNmax 999 \
+                --outFilterMismatchNoverReadLmax 0.04 \
+                --alignIntronMin 20 \
+                --alignIntronMax 5000000 \
+                --alignMatesGapMax 1000000 \
+                --readFilesCommand zcat \
+                --runThreadN {threads} \
+                --outSAMtype BAM Unsorted \
+                --outSAMstrandField intronMotif \
+                --outSAMheaderHD @HD VN:1.4 SO:coordinate \
+                --outFileNamePrefix {wildcards.plant}/results/bam/{wildcards.sample}/STAR
+            """
+
+
+
+rule sort_bam:
+    input: "{plant}/results/bam/{sample}/STARAligned.out.bam"
+    output: "{plant}/results/bam/{sample}/STARAligned.sorted.bam"
+    threads: 8
+    resources:
+        mem_mb=64000,
+        runtime=360,
+        nodes=1,
+        cpus_per_task=8
+    conda: "envs/STAR.yaml"
+    shell: """
+            samtools sort -m 5G -@ {threads} -o {output} {input}
+
+            samtools index {output}
+            """
+
+
+
+rule star_index:
+    input:
+        genome="{plant}/reference/genome.fa",
+        gff="{plant}/reference/annotation.gtf"
+    output: directory("{plant}/results/index/STAR")
+    threads: 24
+    resources:
+        mem_mb=256000,
+        runtime=360,
+        nodes=1,
+        cpus_per_task=24
+    conda: "envs/STAR.yaml"
+    shell: """
+	   STAR --genomeSAindexNbases 11 \
+                --runThreadN {threads} \
+                --runMode genomeGenerate \
+                --genomeFastaFiles {input.genome} \
+                --sjdbGTFfile {input.gff} \
+                --sjdbOverhang 257 \
+                --limitGenomeGenerateRAM 256000000000 \
+                --genomeDir {output}
            """
 
 
@@ -219,12 +300,12 @@ rule salmon_pe:
     output:
         '{plant}/results/salmon/{sample}/quant.sf'
     threads:
-        8
+        16 
     resources:
         mem_mb=64000,
         runtime=360,
         nodes=1,
-        cpus_per_task=8
+        cpus_per_task=16
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check quant -l A --numGibbsSamples 30 \
@@ -245,12 +326,12 @@ rule salmon_se:
     output:
         '{plant}/results/salmon/{sample}/quant.sf'
     threads:
-        8
+        16
     resources:
         mem_mb=64000,
         runtime=360,
         nodes=1,
-        cpus_per_task=8
+        cpus_per_task=16
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check quant -l A --numGibbsSamples 30 \
@@ -272,7 +353,12 @@ rule salmon_pe_rrna:
     output:
         '{plant}/results/salmon_rrna/{sample}/quant.sf'
     threads:
-        8
+        16
+    resources:
+        mem_mb=32000,
+        runtime=360,
+        nodes=1,
+        cpus_per_task=16
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check quant -l A \
@@ -292,7 +378,12 @@ rule salmon_se_rrna:
     output:
         '{plant}/results/salmon_rrna/{sample}/quant.sf'
     threads:
-        8
+        16
+    resources:
+        mem_mb=32000,
+        runtime=360,
+        nodes=1,
+        cpus_per_task=16
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check quant -l A \
@@ -312,7 +403,7 @@ rule salmon_pe_quantiles:
     output:
         '{plant}/results/salmon_quantiles/{sample}/quant.sf'
     threads:
-        8
+        16
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check quant -l A \
@@ -331,7 +422,7 @@ rule salmon_se_quantiles:
     output:
         '{plant}/results/salmon_quantiles/{sample}/quant.sf'
     threads:
-        8
+        16
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check quant -l A \
@@ -348,6 +439,13 @@ rule fai:
     output: "{genome}.fai"
     conda: "envs/samtools.yaml"
     shell: "samtools faidx {input}"
+
+
+
+rule plant_bam:
+    input: lambda wildcards: get_inputs(wildcards.plant, "bam")
+    output: "{plant}/.bam_done"
+    shell: """ touch {output} """
 
 
 
