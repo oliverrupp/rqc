@@ -349,6 +349,7 @@ rule salmon_pe_rrna:
     input:
         r1pe="{plant}/results/trimmed/{sample}_R1.fastq.gz",
         r2pe="{plant}/results/trimmed/{sample}_R2.fastq.gz",
+
         index="{plant}/results/index/salmon_rrna/index.complete"
     output:
         '{plant}/results/salmon_rrna/{sample}/quant.sf'
@@ -459,7 +460,8 @@ rule report_pdf:
     output:
         report='{plant}/{plant}.report.pdf'
     conda: "envs/R.yaml"
-    params: reads=100000
+    resources: semaphore=1 
+    params: reads=10000000
     script: "scripts/rup2.R"
 
 

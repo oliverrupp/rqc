@@ -1,7 +1,10 @@
+options(java.parameters = "-Xmx2048m")
+
 suppressMessages(library(tidyr))
 suppressMessages(library(dplyr))
 suppressMessages(library(tidyverse))
 suppressMessages(library(ggplot2))
+suppressMessages(library(edgeR))
 suppressMessages(library(reshape2))
 suppressMessages(library(pheatmap))
 suppressMessages(library(ComplexHeatmap))
@@ -12,11 +15,10 @@ suppressMessages(library(BiocFileCache))
 suppressMessages(library(DESeq2))
 suppressMessages(library(gtools))
 suppressMessages(library(getopt))
-suppressMessages(library(xlsx))
 suppressMessages(library(moments))
 suppressMessages(library(PCAtools))
-
-
+suppressMessages(library(xlsx))
+suppressMessages(library(filelock))
 
 #### setwd("/vol/ranomics/rnaseq/QC/AC/")
 
@@ -45,7 +47,7 @@ if (exists("snakemake")) {
   outfile <- basename(snakemake@output[["report"]])
 }
 
-pdf(outfile, w = 18, h = 12)
+pdf(outfile, w = 24, h = 16)
 
 theme_set(theme_bw())
 
@@ -153,6 +155,8 @@ print(reads_plot)
 
 ##################### COLLECT COUNTS ##########################################
 
+mtx <- lock("~/.tximeta.lock")
+
 bcf_dir <- file.path(getwd(), "results/index/BFC")
 index_dir <- file.path(getwd(), "results/index/salmon")
 fasta_path <- file.path(getwd(), "reference/genome.fa")
@@ -174,13 +178,48 @@ makeLinkedTxome(indexDir = index_dir,
 se <- tximeta(sample_info)
 gse <- summarizeToGene(se)
 
+
+transcript_count_matrix <- assay(se, "counts")
 gene_count_matrix <- assay(gse, "counts")
 dds <- DESeqDataSet(gse, design = ~condition)
+tr_dds <- DESeqDataSet(se, design = ~condition)
 vsd <- vst(dds, blind = FALSE)
 cor_data <- assay(vsd)
 
+# TMM
+dge <- DGEList(counts=gene_count_matrix, group=factor(sample_info[colnames(gene_count_matrix),]$condition))
+dge <- dge[filterByExpr(dge), , keep.lib.sizes = FALSE]
+dge <- calcNormFactors(dge, method = "TMM")
+TMM_counts <- cpm(dge, normalized.lib.sizes = TRUE)
+
+tr_dge <- DGEList(counts=transcript_count_matrix, group=factor(sample_info[colnames(transcript_count_matrix),]$condition))
+tr_dge <- tr_dge[filterByExpr(tr_dge), , keep.lib.sizes = FALSE]
+tr_dge <- calcNormFactors(tr_dge, method = "TMM")
+tr_TMM_counts <- cpm(tr_dge, normalized.lib.sizes = TRUE)
+
+# geTMM
+
+tr_rpk <- transcript_count_matrix / assay(se, "length")
+gene_rpk <- gene_count_matrix / assay(gse, "length")
+
+tr_norm_edger <- DGEList(counts=tr_rpk,group=colData(se)$condition)
+gene_norm_edger <- DGEList(counts=gene_rpk,group=colData(gse)$condition)
+
+tr_norm_edger <- tr_norm_edger[filterByExpr(tr_norm_edger), , keep.lib.sizes = FALSE]
+gene_norm_edger <- gene_norm_edger[filterByExpr(gene_norm_edger), , keep.lib.sizes = FALSE]
+
+tr_norm_edger <- calcNormFactors(tr_norm_edger, method = "TMM")
+gene_norm_edger <- calcNormFactors(gene_norm_edger, method = "TMM")
+
+tr_geTMM_counts <- cpm(tr_norm_edger)
+gene_geTMM_counts <- cpm(gene_norm_edger)
+
+# correlation
+
 sample_cor <- cor(cor_data, method = "pearson", use = "pairwise.complete.obs")
 sample_dist <- as.matrix(dist(t(cor_data)))
+
+unlock(mtx)
 
 ###############################################################################
 
@@ -365,6 +404,43 @@ ComplexHeatmap::pheatmap(as.matrix(deg_matrix), cluster_rows = FALSE, cluster_co
 
 
 
+##################### CHECK FACTORS ###########################################
+# https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html
+
+geoMeanNZ <- function(x) {
+  if (all(x == 0)) { 0 }
+  else {
+    exp(sum(log(x[x > 0])) / length(x[x > 0]))
+  }
+}
+geoMeans <- apply(cor_data, 1, geoMeanNZ)
+loggeomeans <- log(geoMeans)
+
+df <- lapply(1:ncol(cor_data), function(smple) {
+  cnts <- cor_data[,smple]
+  r <- (log(cnts) - loggeomeans)[is.finite(loggeomeans) & cnts > 0]
+  smple_name <- colnames(cor_data)[smple]
+  data.frame(ratios = r, sample = smple_name, stringsAsFactors = FALSE)
+}) %>% bind_rows()
+
+df$replicate = df$sample
+df$sample = sample_info[df$replicate,]$condition
+
+factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
+  geom_vline(xintercept=0) + geom_density() + theme_bw() 
+print(factor_plot)
+
+split_factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
+  geom_vline(xintercept=0) + geom_density() + theme_bw() + facet_wrap(~sample)
+print(split_factor_plot)
+
+###############################################################################
+
+
+
+
+
+
 ##################### SAMPLE CORRELATION ######################################
 
 a <- data.frame(samples = sample_info[colnames(cor_data), 1])
@@ -379,6 +455,8 @@ pca_res <- pca(cor_data, metadata = colData(se))
 
 biplot(pca_res, x = "PC2", y = "PC1",
        colby = "condition", title = "PCA of VST counts")
+
+s = read.table("reference/samples.tsv", header=T, sep="\t", row.names = 2)
 
 if (length(colnames(s)) > 1) {
   pc <- pca_res$rotated[,1:5]
@@ -558,24 +636,55 @@ write.table(xsheet1, paste0(outfile, ".report.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = FALSE, append = FALSE)
 
-write.xlsx2(xsheet1, paste0(outfile, ".report.xlsx"),
-            sheetName = "sequencing results",
-            col.names = TRUE, row.names = FALSE, append = FALSE)
+#write.xlsx2(xsheet1, paste0(outfile, ".report.xlsx"),
+#            sheetName = "sequencing results",
+#            col.names = TRUE, row.names = FALSE, append = FALSE)
+#gc()
 
-write.xlsx2(xsheet2, paste0(outfile, ".report.xlsx"),
-            sheetName = "reads per gene",
-            col.names = TRUE, row.names = FALSE, append = TRUE)
+#write.xlsx2(xsheet2, paste0(outfile, ".report.xlsx"),
+#            sheetName = "reads per gene",
+#            col.names = TRUE, row.names = FALSE, append = TRUE)
+#gc()
 
-write.xlsx2(xsheet3, paste0(outfile, ".report.xlsx"),
-            sheetName = "sample correlation",
-            col.names = TRUE, row.names = TRUE, append = TRUE)
+#write.xlsx2(xsheet3, paste0(outfile, ".report.xlsx"),
+#            sheetName = "sample correlation",
+#            col.names = TRUE, row.names = TRUE, append = TRUE)
+#gc()
 
-write.table(xsheet4, paste0(outfile, ".raw.counts.tsv"),
-            sep = "\t", quote = FALSE,
-            col.names = TRUE, row.names = TRUE, append = TRUE)
-
-write.table(xsheet5, paste0(outfile, ".TMP.normalized.tsv"),
+write.table(xsheet4, paste0(outfile, ".genes.raw.counts.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
 
+write.table(xsheet5, paste0(outfile, ".genes.TPM.normalized.tsv"),
+            sep = "\t", quote = FALSE,
+            col.names = TRUE, row.names = TRUE, append = FALSE)
+
+write.table(TMM_counts, paste0(outfile, ".genes.TMM.normalized.tsv"),
+            sep = "\t", quote = FALSE,
+            col.names = TRUE, row.names = TRUE, append = FALSE)
+
+write.table(gene_geTMM_counts, paste0(outfile, ".genes.geTMM.normalized.tsv"),
+            sep = "\t", quote = FALSE,
+            col.names = TRUE, row.names = TRUE, append = FALSE)
+
+
+write.table(assay(tr_dds, "counts"), paste0(outfile, ".transcripts.raw.counts.tsv"),
+            sep = "\t", quote = FALSE,
+            col.names = TRUE, row.names = TRUE, append = FALSE)
+
+write.table(assay(tr_dds, "abundance"), paste0(outfile, ".transcripts.TPM.normalized.tsv"),
+            sep = "\t", quote = FALSE,
+            col.names = TRUE, row.names = TRUE, append = FALSE)
+
+write.table(tr_TMM_counts, paste0(outfile, ".transcripts.TMM.normalized.tsv"),
+            sep = "\t", quote = FALSE,
+            col.names = TRUE, row.names = TRUE, append = FALSE)
+
+write.table(tr_geTMM_counts, paste0(outfile, ".transcripts.geTMM.normalized.tsv"),
+            sep = "\t", quote = FALSE,
+            col.names = TRUE, row.names = TRUE, append = FALSE)
+
+
+
 ###############################################################################
+

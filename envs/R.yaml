@@ -9,10 +9,11 @@ dependencies:
  - r-reshape2
  - r-pheatmap
  - r-rjson
- - bioconductor-tximeta
- - bioconductor-deseq2
- - bioconductor-pcatools
  - r-tidyverse
- - bioconductor-complexheatmap
  - r-moments
  - r-xlsx
+ - bioconductor-tximeta
+ - bioconductor-deseq2
+ - bioconductor-edger
+ - bioconductor-pcatools
+ - bioconductor-complexheatmap
