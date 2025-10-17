@@ -460,7 +460,7 @@ rule report_pdf:
     output:
         report='{plant}/{plant}.report.pdf'
     conda: "envs/R.yaml"
-    resources: semaphore=1 
+    threads: 1
     params: reads=10000000
     script: "scripts/rup2.R"
 
