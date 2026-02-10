@@ -19,6 +19,7 @@ suppressMessages(library(moments))
 suppressMessages(library(PCAtools))
 suppressMessages(library(xlsx))
 suppressMessages(library(filelock))
+suppressMessages(library(scales))
 
 #### setwd("/vol/ranomics/rnaseq/QC/AC/")
 
@@ -71,6 +72,8 @@ sample_info$files <-
 sample_info$names <- rownames(sample_info)
 
 samples <- row.names(sample_info)
+
+message(sample_info)
 
 ###############################################################################
 
@@ -140,8 +143,17 @@ results$status <- factor(results$status,
                                         "TooLong", "LowQuality")))
 
 reads_plot <- ggplot(results, aes(x = sample, y = reads, fill = status)) +
-  geom_hline(yintercept=c(30e6, 50e6)) +
+  geom_hline(yintercept=c(min_assigned_read_count, 50e6)) +
   geom_bar(stat = "identity") +
+  scale_y_continuous(
+    	breaks = function(x) {
+      		default_breaks <- extended_breaks()(x)
+      		sort(c(default_breaks, min_assigned_read_count))
+    	},
+    	labels = function(breaks) {
+     		ifelse(breaks == min_assigned_read_count, "minimal read count", breaks)
+    	}
+  ) + 
   theme(text = element_text(size = 18)) + ggtitle("Read count analysis") +
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
@@ -149,7 +161,15 @@ print(reads_plot)
 
 ###############################################################################
 
+#message(sample_info)
+sink(file.path(getwd(), "filtered_samples.txt"))
+print(paste0("Low Read Count [<, ", min_assigned_read_count, "]:"))
+print(results[results$status == "Assigned" & results$reads < min_assigned_read_count,]$sample)  
+sink()
 
+samples <- results[results$status == "Assigned" & results$reads >= min_assigned_read_count,]$sample
+
+sample_info <- sample_info[samples,]
 
 
 
@@ -178,13 +198,10 @@ makeLinkedTxome(indexDir = index_dir,
 se <- tximeta(sample_info)
 gse <- summarizeToGene(se)
 
-
 transcript_count_matrix <- assay(se, "counts")
 gene_count_matrix <- assay(gse, "counts")
-dds <- DESeqDataSet(gse, design = ~condition)
-tr_dds <- DESeqDataSet(se, design = ~condition)
-vsd <- vst(dds, blind = FALSE)
-cor_data <- assay(vsd)
+
+##### edgeR #####
 
 # TMM
 dge <- DGEList(counts=gene_count_matrix, group=factor(sample_info[colnames(gene_count_matrix),]$condition))
@@ -198,21 +215,46 @@ tr_dge <- calcNormFactors(tr_dge, method = "TMM")
 tr_TMM_counts <- cpm(tr_dge, normalized.lib.sizes = TRUE)
 
 # geTMM
-
 tr_rpk <- transcript_count_matrix / assay(se, "length")
 gene_rpk <- gene_count_matrix / assay(gse, "length")
+
+tr_len <- assay(se, "length")
+tr_len_m <- melt(tr_len)
+colnames(tr_len_m) <- c("id", "sample", "length")
+
+# real_len_plot <- ggplot(tr_len_m, aes(x = sample, y = length)) + 
+#	geom_boxplot() + scale_y_log10() + 
+#	theme(axis.text.x = element_text(angle = 90, hjust = 0))
+# print(real_len_plot)
 
 tr_norm_edger <- DGEList(counts=tr_rpk,group=colData(se)$condition)
 gene_norm_edger <- DGEList(counts=gene_rpk,group=colData(gse)$condition)
 
-tr_norm_edger <- tr_norm_edger[filterByExpr(tr_norm_edger), , keep.lib.sizes = FALSE]
-gene_norm_edger <- gene_norm_edger[filterByExpr(gene_norm_edger), , keep.lib.sizes = FALSE]
+#tr_norm_edger <- tr_norm_edger[filterByExpr(tr_norm_edger), , keep.lib.sizes = FALSE]
+#gene_norm_edger <- gene_norm_edger[filterByExpr(gene_norm_edger), , keep.lib.sizes = FALSE]
 
 tr_norm_edger <- calcNormFactors(tr_norm_edger, method = "TMM")
 gene_norm_edger <- calcNormFactors(gene_norm_edger, method = "TMM")
 
 tr_geTMM_counts <- cpm(tr_norm_edger)
 gene_geTMM_counts <- cpm(gene_norm_edger)
+
+####### edgeR ######
+
+
+sample_info %>% group_by(condition) %>% summarize(rep_num = n()) -> rep_num
+message(rep_num)
+
+#### DESeq2 ####
+dds <- DESeqDataSet(gse, design = ~condition)
+tr_dds <- DESeqDataSet(se, design = ~condition)
+vsd <- vst(dds, blind = sum(rep_num$rep_num > 1) == 0) # blind = TRUE if no replicates!
+cor_data <- assay(vsd)
+
+transcript_TPM_matrix <- assay(tr_dds, "abundance")
+gene_TPM_matrix <- assay(dds, "abundance")
+
+#### DESeq2 ####
 
 # correlation
 
@@ -468,7 +510,7 @@ if (length(colnames(s)) > 1) {
 
   pcm <- pivot_longer(pcl, cols = colnames(s))
 
-  batch_pca_plot <- ggplot(pcm, aes(x = value, y = rot)) + geom_point() +
+  batch_pca_plot <- ggplot(pcm, aes(x = value, y = rot)) + geom_boxplot() + geom_point() +
     facet_grid(PC~name, scale = "free_x") + ggtitle("PC by batch") +
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
@@ -483,58 +525,58 @@ if (length(colnames(s)) > 1) {
 
 ##################### FILTER SAMPLES ##########################################
 
-if (FALSE) {
-remove_by_reads <- results[results$status == "Assigned" &
-                             results$reference == "Gene" &
-                             results$reads <= min_assigned_read_count, ]$sample
+## if (FALSE) {
+## remove_by_reads <- results[results$status == "Assigned" &
+##                              results$reference == "Gene" &
+##                              results$reads <= min_assigned_read_count, ]$sample
 
-remove_by_correlation <- c()
+## remove_by_correlation <- c()
 
-sample_cor_filtered <- sample_cor[! rownames(sample_cor) %in% remove_by_reads,
-                                  ! colnames(sample_cor) %in% remove_by_reads]
+## sample_cor_filtered <- sample_cor[! rownames(sample_cor) %in% remove_by_reads,
+##                                   ! colnames(sample_cor) %in% remove_by_reads]
 
-for (sample_name in unique(sample_info$condition)) {
-  message(sample_name)
+## for (sample_name in unique(sample_info$condition)) {
+##   message(sample_name)
 
-  if (sum(sample_info$condition == sample_name) > 2) {
-    sr <- sample_info[sample_info$condition == sample_name, ]$names
-    sr <- sr[! sr %in% remove_by_reads]
+##   if (sum(sample_info$condition == sample_name) > 2) {
+##     sr <- sample_info[sample_info$condition == sample_name, ]$names
+##     sr <- sr[! sr %in% remove_by_reads]
 
-    if (length(sr) > 1) {
-      rep_num <- sum(sample_info$condition == sample_name)
-      low_cor <-
-        rowSums(sample_cor_filtered[sr, sr] <= min_sample_correlation)
+##     if (length(sr) > 1) {
+##       rep_num <- sum(sample_info$condition == sample_name)
+##       low_cor <-
+##         rowSums(sample_cor_filtered[sr, sr] <= min_sample_correlation)
 
-      if (sum(low_cor / rep_num > 0.67)) {
-        low_ids <- names(low_cor[low_cor / rep_num > 0.67])
-        remove_by_correlation <- c(remove_by_correlation, low_ids)
-      }
-    }
-  }
-}
+##       if (sum(low_cor / rep_num > 0.67)) {
+##         low_ids <- names(low_cor[low_cor / rep_num > 0.67])
+##         remove_by_correlation <- c(remove_by_correlation, low_ids)
+##       }
+##     }
+##   }
+## }
 
-low_q_samples <- c(remove_by_reads, remove_by_correlation)
+## low_q_samples <- c(remove_by_reads, remove_by_correlation)
 
-message(low_q_samples)
+## message(low_q_samples)
 
-if (length(low_q_samples) > 0) {
-  lowq <- data.frame(sample = low_q_samples, reason = "low read number")
-  if (length(remove_by_correlation) > 0) {
-    remove_rows <- lowq$sample %in% remove_by_correlation
-    lowq[remove_rows, ]$reason <- "low in-sample correlation"
-  }
+## if (length(low_q_samples) > 0) {
+##   lowq <- data.frame(sample = low_q_samples, reason = "low read number")
+##   if (length(remove_by_correlation) > 0) {
+##     remove_rows <- lowq$sample %in% remove_by_correlation
+##     lowq[remove_rows, ]$reason <- "low in-sample correlation"
+##   }
 
-  removed_plot <- ggplot(lowq, aes(y = sample, x = reason, col = I("red"))) +
-    geom_point(size = 4) +
-    theme(text = element_text(size = 18)) +
-    ylab("Replicates") + xlab(NULL) +
-    ggtitle("Low Quality Samples")
+##   removed_plot <- ggplot(lowq, aes(y = sample, x = reason, col = I("red"))) +
+##     geom_point(size = 4) +
+##     theme(text = element_text(size = 18)) +
+##     ylab("Replicates") + xlab(NULL) +
+##     ggtitle("Low Quality Samples")
 
-  print(removed_plot)
-}
-}
+##   print(removed_plot)
+## }
+## }
 
-low_q_samples <- c()
+## low_q_samples <- c()
 
 ###############################################################################
 
@@ -544,29 +586,29 @@ low_q_samples <- c()
 
 ##################### FILTERED SAMPLES PLOT ###################################
 
-if (length(low_q_samples) > 0 && length(low_q_samples) < ncol(cor_data)) {
-  message("FILTERED:")
-  message(length(low_q_samples))
-  message(ncol(cor_data))
-  cor_data_filtered <- cor_data[, !colnames(cor_data) %in% low_q_samples]
+## if (length(low_q_samples) > 0 && length(low_q_samples) < ncol(cor_data)) {
+##   message("FILTERED:")
+##   message(length(low_q_samples))
+##   message(ncol(cor_data))
+##   cor_data_filtered <- cor_data[, !colnames(cor_data) %in% low_q_samples]
 
-  sample_cor_filtered <- cor(cor_data_filtered,
-                             method = "pearson",
-                             use = "pairwise.complete.obs")
+##   sample_cor_filtered <- cor(cor_data_filtered,
+##                              method = "pearson",
+##                              use = "pairwise.complete.obs")
 
-  sample_dist_filtered <- as.matrix(dist(t(cor_data_filtered)))
+##   sample_dist_filtered <- as.matrix(dist(t(cor_data_filtered)))
 
-  pheatmap::pheatmap(sample_cor_filtered, fontsize = 10,
-                     annotation_col = a,
-                     main = "Filtered Sample Correlation Heatmap")
+##   pheatmap::pheatmap(sample_cor_filtered, fontsize = 10,
+##                      annotation_col = a,
+##                      main = "Filtered Sample Correlation Heatmap")
 
-  metadata <- colData(se)[!rownames(colData(se)) %in% low_q_samples, ]
-  pca_res <- pca(cor_data_filtered, metadata = metadata)
+##   metadata <- colData(se)[!rownames(colData(se)) %in% low_q_samples, ]
+##   pca_res <- pca(cor_data_filtered, metadata = metadata)
 
-  biplot(pca_res, x = "PC2", y = "PC1",
-         colby = "condition",
-         title = "PCA of VST counts (filtered samples)")
-}
+##   biplot(pca_res, x = "PC2", y = "PC1",
+##          colby = "condition",
+##          title = "PCA of VST counts (filtered samples)")
+## }
 
 ###############################################################################
 
@@ -576,7 +618,11 @@ if (length(low_q_samples) > 0 && length(low_q_samples) < ncol(cor_data)) {
 
 ##################### (FILTERED) PCA PLOTS ####################################
 
-pair <- pairsplot(pca_res, colby = "condition")
+components <- getComponents(pca_res, seq_len(5))
+components <- components[!is.na(components)]
+
+pair <- pairsplot(pca_res, colby = "condition", components = components)
+
 scree <- screeplot(pca_res, axisLabSize = 18, titleLabSize = 22)
 
 print(pair)
@@ -628,10 +674,6 @@ xsheet2 <- df
 
 xsheet3 <- sample_cor
 
-xsheet4 <- assay(dds, "counts")
-
-xsheet5 <- assay(dds, "abundance")
-
 write.table(xsheet1, paste0(outfile, ".report.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = FALSE, append = FALSE)
@@ -651,11 +693,11 @@ write.table(xsheet1, paste0(outfile, ".report.tsv"),
 #            col.names = TRUE, row.names = TRUE, append = TRUE)
 #gc()
 
-write.table(xsheet4, paste0(outfile, ".genes.raw.counts.tsv"),
+write.table(gene_count_matrix, paste0(outfile, ".genes.raw.counts.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
 
-write.table(xsheet5, paste0(outfile, ".genes.TPM.normalized.tsv"),
+write.table(gene_TPM_matrix, paste0(outfile, ".genes.TPM.normalized.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
 
@@ -668,11 +710,11 @@ write.table(gene_geTMM_counts, paste0(outfile, ".genes.geTMM.normalized.tsv"),
             col.names = TRUE, row.names = TRUE, append = FALSE)
 
 
-write.table(assay(tr_dds, "counts"), paste0(outfile, ".transcripts.raw.counts.tsv"),
+write.table(transcript_count_matrix, paste0(outfile, ".transcripts.raw.counts.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
 
-write.table(assay(tr_dds, "abundance"), paste0(outfile, ".transcripts.TPM.normalized.tsv"),
+write.table(transcript_TPM_matrix, paste0(outfile, ".transcripts.TPM.normalized.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
 

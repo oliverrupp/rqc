@@ -2,7 +2,7 @@ import os
 from itertools import product
 
 
-(PLANTS, )=glob_wildcards('{plants}/reference/genome.fa')
+(PLANTS, )=glob_wildcards('{plants}/reference/samples.tsv')
 (PLANTS2, SAMPLES, PE, )=glob_wildcards('{plants}/reads/{samples}_{s}.fq.gz')
 
 
@@ -200,6 +200,15 @@ rule gentrome:
            """
 
 
+rule gtf:
+    input: "{plant}/reference/annotation.gff3"
+    output: "{plant}/reference/annotation.gtf"
+    conda: "envs/gffread.yaml"
+    shell: """
+           gffread {input} -T -o {output} 
+           """
+
+
 
 rule transcripts:
     input:
@@ -252,7 +261,7 @@ rule rrna_gtf:
     script: "scripts/barrnap2gtf.py"
 
 
-            
+#TODO: move minimal length to config.yaml
 rule trim_pe:
     input:
         r1="{plant}/reads/{sample}_1.fq.gz",
@@ -270,7 +279,7 @@ rule trim_pe:
            fastp -i {input.r1} -I {input.r2} \
                  -o {output.r1pe} -O {output.r2pe} \
                  --unpaired1 {output.r1se} --unpaired2 {output.r2se} \
-                 -j {output.json} -l 50 -h /dev/null
+                 -j {output.json} -l 35 -h /dev/null
            """
 
 
@@ -287,7 +296,7 @@ rule trim_se:
     shell: """
            fastp -i {input.rs}  \
                  -o {output.rse}  \
-                 -j {output.json} -l 50 -h /dev/null
+                 -j {output.json} -l 35 -h /dev/null
            """
 
 
@@ -309,7 +318,7 @@ rule salmon_pe:
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check quant -l A --numGibbsSamples 30 \
-		  --gcBias --validateMappings \
+		  --gcBias --validateMappings --minAssignedFrags 0 \
 		  --allowDovetail \
 	   	  -i {wildcards.plant}/results/index/salmon \
 		  -p {threads} \
@@ -335,7 +344,7 @@ rule salmon_se:
     conda: "envs/salmon.yaml"
     shell: """
            salmon --no-version-check quant -l A --numGibbsSamples 30 \
-		  --gcBias --validateMappings \
+		  --gcBias --validateMappings --minAssignedFrags 0 \
 		  --allowDovetail \
 	   	  -i {wildcards.plant}/results/index/salmon \
 		  -p {threads} \
@@ -362,7 +371,7 @@ rule salmon_pe_rrna:
         cpus_per_task=16
     conda: "envs/salmon.yaml"
     shell: """
-           salmon --no-version-check quant -l A \
+           salmon --no-version-check quant -l A --minAssignedFrags 0 \
 	   	  -i {wildcards.plant}/results/index/salmon_rrna \
 		  -p {threads} \
 		  -o {wildcards.plant}/results/salmon_rrna/{wildcards.sample} \
@@ -387,7 +396,7 @@ rule salmon_se_rrna:
         cpus_per_task=16
     conda: "envs/salmon.yaml"
     shell: """
-           salmon --no-version-check quant -l A \
+           salmon --no-version-check quant -l A --minAssignedFrags 0 \
 	   	  -i {wildcards.plant}/results/index/salmon_rrna \
 		  -p {threads} \
 		  -o {wildcards.plant}/results/salmon_rrna/{wildcards.sample}\
@@ -407,7 +416,7 @@ rule salmon_pe_quantiles:
         16
     conda: "envs/salmon.yaml"
     shell: """
-           salmon --no-version-check quant -l A \
+           salmon --no-version-check quant -l A --minAssignedFrags 0 \
 	   	  -i {wildcards.plant}/results/index/salmon_quantiles \
 		  -p {threads} \
 		  -o {wildcards.plant}/results/salmon_quantiles/{wildcards.sample} \
@@ -426,13 +435,12 @@ rule salmon_se_quantiles:
         16
     conda: "envs/salmon.yaml"
     shell: """
-           salmon --no-version-check quant -l A \
+           salmon --no-version-check quant -l A --minAssignedFrags 0 \
 	   	  -i {wildcards.plant}/results/index/salmon_quantiles \
 		  -p {threads} \
 		  -o {wildcards.plant}/results/salmon_quantiles/{wildcards.sample} \
 		  -r {input.rse}
            """
-
 
 
 rule fai:
@@ -461,7 +469,7 @@ rule report_pdf:
         report='{plant}/{plant}.report.pdf'
     conda: "envs/R.yaml"
     threads: 1
-    params: reads=10000000
+    params: reads=1000000
     script: "scripts/rup2.R"
 
 
