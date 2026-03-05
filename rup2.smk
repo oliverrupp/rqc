@@ -279,7 +279,7 @@ rule trim_pe:
            fastp -i {input.r1} -I {input.r2} \
                  -o {output.r1pe} -O {output.r2pe} \
                  --unpaired1 {output.r1se} --unpaired2 {output.r2se} \
-                 -j {output.json} -l 35 -h /dev/null
+                 -j {output.json} -l 50 -h /dev/null
            """
 
 
@@ -296,7 +296,7 @@ rule trim_se:
     shell: """
            fastp -i {input.rs}  \
                  -o {output.rse}  \
-                 -j {output.json} -l 35 -h /dev/null
+                 -j {output.json} -l 50 -h /dev/null
            """
 
 

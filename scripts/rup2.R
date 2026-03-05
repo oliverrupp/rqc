@@ -431,6 +431,29 @@ skewclass <- skewclass[rev(order(skewness))]
 
 cclass <- data.frame(degradation = skewclass)
 
+s <- read.table("reference/samples.tsv", header=T, sep="\t", row.names = 2)
+
+s <- s[samples,]
+
+if (length(colnames(s)) > 1) {
+	faktors <- colnames(s)
+	message(faktors)
+	faktors <- faktors[!faktors %in% c("condition")]
+
+	for(f in faktors) {
+            flist = s[,f]
+            names(flist) = rownames(s)
+            
+            flist <- factor(flist)
+            cclass[[f]] <- flist
+
+            fcols <- rainbow(length(unique(flist)))
+            names(fcols) <- unique(flist)
+
+            ccols[[f]] <- fcols
+	}
+}
+
 deg_matrix <- deg_matrix[rev(order(skewness)),]
 
 ComplexHeatmap::pheatmap(as.matrix(deg_matrix), cluster_rows = FALSE, cluster_cols = FALSE,
@@ -488,9 +511,39 @@ print(split_factor_plot)
 a <- data.frame(samples = sample_info[colnames(cor_data), 1])
 row.names(a) <- colnames(cor_data)
 
+s = read.table("reference/samples.tsv", header=T, sep="\t", row.names = 2)
+s <- s[samples,]
+
+conds <- sort(unique(s$condition))
+condcols <- rainbow(length(conds))
+names(condcols) <- conds
+
+ccols = list(condition = condcols)
+
+if (length(colnames(s)) > 1) {
+	faktors <- colnames(s)
+	message(faktors)
+	faktors <- faktors[!faktors %in% c("condition")]
+
+	for(f in faktors) {
+            flist = s[,f]
+            names(flist) = rownames(s)
+            
+            flist <- factor(flist)
+            a[[f]] <- flist
+
+            fcols <- rainbow(length(unique(flist)))
+            names(fcols) <- unique(flist)
+
+            ccols[[f]] <- fcols
+	}
+}
+
+
 pheatmap::pheatmap(sample_cor,
                    fontsize = 12,
                    annotation_col = a,
+                   annotation_colors = ccols,
                    main = "Sample Correlation Heatmap of VST counts")
 
 pca_res <- pca(cor_data, metadata = colData(se))
@@ -498,7 +551,6 @@ pca_res <- pca(cor_data, metadata = colData(se))
 biplot(pca_res, x = "PC2", y = "PC1",
        colby = "condition", title = "PCA of VST counts")
 
-s = read.table("reference/samples.tsv", header=T, sep="\t", row.names = 2)
 
 if (length(colnames(s)) > 1) {
   pc <- pca_res$rotated[,1:5]
@@ -641,42 +693,53 @@ dev.off()
 ###############################################################################
 
 
-
-
-
 ##################### WRITE DATA ##############################################
+
+outfile <- gsub(".pdf", "", outfile)
+
+deb <- 1
+message(paste0("output ", deb)); deb <- deb + 1
 
 xsheet1 <- pivot_wider(results[results$reference == "Gene", ],
                        id_cols = "sample",
                        names_from = "status",
                        values_from = "reads")
+message(paste0("output ", deb)); deb <- deb + 1
 
 xsheet1$trimmed <- (xsheet1$LowQuality +
                       xsheet1$Nreads +
                       xsheet1$TooShort +
                       xsheet1$TooLong)
+message(paste0("output ", deb)); deb <- deb + 1
 
 
 xsheet1 <- xsheet1 %>%
   dplyr::select(-one_of("LowQuality", "Nreads", "TooShort", "TooLong"))
+message(paste0("output ", deb)); deb <- deb + 1
 
 rrnar <- results[results$reference == "rRNA", ]$reads
+message(paste0("output ", deb)); deb <- deb + 1
 
 names(rrnar) <- results[results$reference == "rRNA", ]$sample
+message(paste0("output ", deb)); deb <- deb + 1
 
 xsheet1 <- cbind(xsheet1, rRNA = rrnar[xsheet1$sample])
+message(paste0("output ", deb)); deb <- deb + 1
 
 skewn <- skewness(t(deg_matrix))
+message(paste0("output ", deb)); deb <- deb + 1
 
-xsheet1 <- cbind(xsheet1, skewness = skewn[xsheet1$sample])
+#xsheet1 <- cbind(xsheet1, skewness = skewn[xsheet1$sample])
+message(paste0("output ", deb)); deb <- deb + 1
 
 xsheet2 <- df
 
 xsheet3 <- sample_cor
 
-write.table(xsheet1, paste0(outfile, ".report.tsv"),
+write.table(xsheet1, paste0(outfile, ".tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = FALSE, append = FALSE)
+message(paste0("output ", deb)); deb <- deb + 1
 
 #write.xlsx2(xsheet1, paste0(outfile, ".report.xlsx"),
 #            sheetName = "sequencing results",
@@ -696,35 +759,43 @@ write.table(xsheet1, paste0(outfile, ".report.tsv"),
 write.table(gene_count_matrix, paste0(outfile, ".genes.raw.counts.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
+message(paste0("output ", deb)); deb <- deb + 1
 
 write.table(gene_TPM_matrix, paste0(outfile, ".genes.TPM.normalized.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
+message(paste0("output ", deb)); deb <- deb + 1
 
 write.table(TMM_counts, paste0(outfile, ".genes.TMM.normalized.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
+message(paste0("output ", deb)); deb <- deb + 1
 
 write.table(gene_geTMM_counts, paste0(outfile, ".genes.geTMM.normalized.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
+message(paste0("output ", deb)); deb <- deb + 1
 
 
 write.table(transcript_count_matrix, paste0(outfile, ".transcripts.raw.counts.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
+message(paste0("output ", deb)); deb <- deb + 1
 
 write.table(transcript_TPM_matrix, paste0(outfile, ".transcripts.TPM.normalized.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
+message(paste0("output ", deb)); deb <- deb + 1
 
 write.table(tr_TMM_counts, paste0(outfile, ".transcripts.TMM.normalized.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
+message(paste0("output ", deb)); deb <- deb + 1
 
 write.table(tr_geTMM_counts, paste0(outfile, ".transcripts.geTMM.normalized.tsv"),
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
+message(paste0("output ", deb)); deb <- deb + 1
 
 
 
