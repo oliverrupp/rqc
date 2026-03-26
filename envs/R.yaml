@@ -6,6 +6,7 @@ dependencies:
  - r-getopt
  - r-gtools
  - r-ggplot2
+ - r-ggpubr
  - r-reshape2
  - r-pheatmap
  - r-rjson
