@@ -5,6 +5,7 @@ suppressMessages(library(dplyr))
 suppressMessages(library(tidyverse))
 suppressMessages(library(ggplot2))
 suppressMessages(library(ggpubr))
+suppressMessages(library(GGally))
 suppressMessages(library(edgeR))
 suppressMessages(library(reshape2))
 suppressMessages(library(pheatmap))
@@ -22,14 +23,14 @@ suppressMessages(library(xlsx))
 suppressMessages(library(filelock))
 suppressMessages(library(scales))
 
-#### setwd("/vol/ranomics/rnaseq/QC/AC/")
+#### setwd("/home/orupp/Projects/trqc/CS")
 
 ##################### INIT ####################################################
 
 ### DEBUG: rm(list=ls())
 ### DEBUG: setwd("/vol/ranomics/rnaseq/QC/TT")
 
-min_assigned_read_count <- 10e6
+min_assigned_read_count <- 100
 min_sample_correlation <- 0.9
 
 spec <- matrix(c(
@@ -52,7 +53,9 @@ if (exists("snakemake")) {
   outfile <- basename(snakemake@output[["report"]])
 }
 
-pdf(outfile, w = 24, h = 16)
+dir.create("results/rds", recursive = TRUE)
+
+# pdf(outfile, w = 24, h = 16)
 
 theme_set(theme_bw())
 
@@ -146,23 +149,24 @@ results$status <- factor(results$status,
                                         "Nreads", "TooShort",
                                         "TooLong", "LowQuality")))
 
-reads_plot <- ggplot(results, aes(x = sample, y = reads, fill = status)) +
-  geom_hline(yintercept=c(min_assigned_read_count, 50e6)) +
-  geom_bar(stat = "identity") +
-  scale_y_continuous(
-    	breaks = function(x) {
-      		default_breaks <- extended_breaks()(x)
-      		sort(c(default_breaks, min_assigned_read_count))
-    	},
-    	labels = function(breaks) {
-     		ifelse(breaks == min_assigned_read_count, "minimal read count", breaks)
-    	}
-  ) + 
-  theme(text = element_text(size = 18)) + ggtitle("Read count analysis") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 0))
+# reads_plot <- ggplot(results, aes(x = sample, y = reads, fill = status)) +
+#   geom_hline(yintercept=c(min_assigned_read_count, 50e6)) +
+#   geom_bar(stat = "identity") +
+#   scale_y_continuous(
+#     	breaks = function(x) {
+#       		default_breaks <- extended_breaks()(x)
+#       		sort(c(default_breaks, min_assigned_read_count))
+#     	},
+#     	labels = function(breaks) {
+#      		ifelse(breaks == min_assigned_read_count, "minimal read count", breaks)
+#     	}
+#   ) + 
+#   theme(text = element_text(size = 18)) + ggtitle("Read count analysis") +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
-saveRDS(reads_plot, file="reads_plot.Rds")
-print(reads_plot)
+saveRDS(results, "results/rds/reads_plot.Rds")
+
+# print(reads_plot)
 
 ###############################################################################
 
@@ -341,23 +345,24 @@ sorted_names <- c(mixedsort(unique(dfm$Replicate)),
                   mixedsort(unique(dfm$Sample)))
 dfm$Replicate <- factor(dfm$Replicate, levels = sorted_names)
 
-gcp_colors <- c("#e0e0e0", "#faa39d", "#dbc160", "#00BA38")
-names(gcp_colors) <- levels(dfm$variable)
+# gcp_colors <- c("#e0e0e0", "#faa39d", "#dbc160", "#00BA38")
+# names(gcp_colors) <- levels(dfm$variable)
+# 
+# gene_coverage_plot <- ggplot(dfm, aes(x = Replicate,
+#                                       y = value,
+#                                       fill = variable)) +
+#   geom_bar(stat = "identity") +
+#   ylab("Number of Genes") + xlab("Samples") +
+#   ggtitle("Number of Reads per Gene") +
+#   guides(fill = guide_legend(title = "Number of assigned reads")) +
+#   theme(text = element_text(size = 18)) +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 0)) +
+#   facet_wrap(~Sample, scale = "free_x") +
+#   scale_fill_manual(values = gcp_colors)
 
-gene_coverage_plot <- ggplot(dfm, aes(x = Replicate,
-                                      y = value,
-                                      fill = variable)) +
-  geom_bar(stat = "identity") +
-  ylab("Number of Genes") + xlab("Samples") +
-  ggtitle("Number of Reads per Gene") +
-  guides(fill = guide_legend(title = "Number of assigned reads")) +
-  theme(text = element_text(size = 18)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 0)) +
-  facet_wrap(~Sample, scale = "free_x") +
-  scale_fill_manual(values = gcp_colors)
+saveRDS(dfm, file="results/rds/gene_coverage_plot.Rds")
 
-saveRDS(gene_coverage_plot, file="gene_coverage_plot.rds")
-print(gene_coverage_plot)
+# print(gene_coverage_plot)
 
 ###############################################################################
 
@@ -462,12 +467,14 @@ if (length(colnames(s)) > 1) {
 
 deg_matrix <- deg_matrix[rev(order(skewness)),]
 
-ComplexHeatmap::pheatmap(as.matrix(deg_matrix), cluster_rows = FALSE, cluster_cols = FALSE,
-                         annotation_row = cclass, annotation_colors = ccols,
-                         treeheight_row = 0, fontsize = 12, border = FALSE,
-                         row_split = skewclass,
-                         heatmap_legend_param = list(title = "coverage (%)"),
-                         main = "RNA degradation (gene body coverage)")
+saveRDS(list(matrix = deg_matrix, colors = ccols, skewclass = skewclass, cclass = cclass), "results/rds/genebody_coverage.Rds")
+
+# ComplexHeatmap::pheatmap(as.matrix(deg_matrix), cluster_rows = FALSE, cluster_cols = FALSE,
+#                          annotation_row = cclass, annotation_colors = ccols,
+#                          treeheight_row = 0, fontsize = 12, border = FALSE,
+#                          row_split = skewclass,
+#                          heatmap_legend_param = list(title = "coverage (%)"),
+#                          main = "RNA degradation (gene body coverage)")
 
 ###############################################################################
 
@@ -497,17 +504,17 @@ df <- lapply(1:ncol(cor_data), function(smple) {
 df$replicate = df$sample
 df$sample = sample_info[df$replicate,]$condition
 
-factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
-    geom_vline(xintercept=0) + geom_density() + theme_bw()
-saveRDS(factor_plot, file="factor_plot.rds")
+# factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
+#     geom_vline(xintercept=0) + geom_density() + theme_bw()
+# 
+# print(factor_plot)
+# 
+# split_factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
+#     geom_vline(xintercept=0) + geom_density() + theme_bw() + facet_wrap(~sample)
+# 
+# print(split_factor_plot)
 
-print(factor_plot)
-
-split_factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
-    geom_vline(xintercept=0) + geom_density() + theme_bw() + facet_wrap(~sample)
-saveRDS(split_factor_plot, file="split_factor_plot.rds")
-
-print(split_factor_plot)
+saveRDS(df, file="results/rds/split_factor_plot.Rds")
 
 ###############################################################################
 
@@ -552,16 +559,26 @@ if (length(colnames(s)) > 1) {
 }
 
 
-pheatmap::pheatmap(sample_cor,
-                   fontsize = 12,
-                   annotation_col = a,
-                   annotation_colors = ccols,
-                   main = "Sample Correlation Heatmap of VST counts")
+# pheatmap::pheatmap(sample_cor,
+#                    fontsize = 12,
+#                    annotation_col = a,
+#                    annotation_colors = ccols,
+#                    main = "Sample Correlation Heatmap of VST counts")
+
+saveRDS(list(sample_cor = sample_cor, a = a, ccols = ccols), "results/rds/correlation_hm.Rds")
+
+#######################################
+
+
+### PCA ####
 
 pca_res <- pca(cor_data, metadata = colData(se))
+saveRDS(pca_res, "results/rds/pca_res.Rds")
 
-biplot(pca_res, x = "PC2", y = "PC1",
-       colby = "condition", title = "PCA of VST counts")
+# biplot(pca_res, x = "PC2", y = "PC1",
+#        colby = "condition", title = "PCA of VST counts")
+
+##################
 
 
 
@@ -579,10 +596,6 @@ group_by_distance <- function(v, max_dist) {
     }
 }
 
-
-condition <- "EC_Q"
-condition <- "EC_Callus_AA"
-pc <- 1
 
 pc95 <- min(length(pca_res$variance), 6) #sum(cumsum(pca_res$variance) < 75)
 outliers <- data.frame(sample = character(), pc = integer())
@@ -636,15 +649,14 @@ if(nrow(outliers) > 0) {
     
     write.table(outlier_df, "PCA_outlier_PC1-5.tsv", sep="\t", quote=F, row.names = F)
 
-    g <- ggplot(dns_values, aes(x=x, y=y)) +
-        geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") +
-        geom_line() +
-        xlab("inner sample PCA distance") + 
-        facet_wrap(~pc)
-
-    saveRDS(g, file="pca_outlier.rds")
-    print(g)
-
+    # g <- ggplot(dns_values, aes(x=x, y=y)) +
+    #     geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") +
+    #     geom_line() +
+    #     xlab("inner sample PCA distance") + 
+    #     facet_wrap(~pc)
+    # print(g)
+### TODO    saveRDS(g, file="pca_outlier.rds")
+    
     outlier_ids <- unique(outliers$sample)
     all_samples <- rownames(s[s$condition %in% unique(s[outlier_ids,,drop=F]$condition),,drop=F])
     
@@ -666,15 +678,13 @@ if(nrow(outliers) > 0) {
     pca_data$PC = paste(pca_data$PC, " [", variance[pca_data$PC], "]", sep="")
     outlier_data$PC = paste(outlier_data$PC, " [", variance[outlier_data$PC], "]", sep="")
     
-    g <- ggplot(pca_data, aes(x = condition, y = rot)) +
-        geom_point() + ggtitle("PCA outlier") + 
-        geom_label(data=outlier_data, aes(label=samples), hjust = 0) +
-        geom_point(data=outlier_data, col="red", size=2) +
-        facet_wrap(~PC)
-    saveRDS(g, file="pca_outlier_2.rds")
-    #pdf("~/outlier.pdf", w = 24, h = 16) 
-    print(g)
-    #dev.off()
+    # g <- ggplot(pca_data, aes(x = condition, y = rot)) +
+    #     geom_point() + ggtitle("PCA outlier") + 
+    #     geom_label(data=outlier_data, aes(label=samples), hjust = 0) +
+    #     geom_point(data=outlier_data, col="red", size=2) +
+    #     facet_wrap(~PC)
+    # print(g)
+### TODO     saveRDS(g, file="pca_outlier_2.rds")
 }
 
 
@@ -697,13 +707,12 @@ if (length(colnames(s)) > 1) {
     compl <- append(compl, batchs)
   }
 
-  batch_pca_plot <- ggplot(pcm, aes(x = value, y = rot)) + geom_boxplot() + geom_jitter(width = 0.2) +
-    stat_compare_means(comparison=compl, method="wilcox.test") +
-    facet_grid(PC~name, scale = "free_x") + ggtitle("PC by batch") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-  saveRDS(batch_pca_plot, file="batch_pca_plot.rds")
-  print(batch_pca_plot)
+  # batch_pca_plot <- ggplot(pcm, aes(x = value, y = rot)) + geom_boxplot() + geom_jitter(width = 0.2) +
+  #   stat_compare_means(comparison=compl, method="wilcox.test") +
+  #   facet_grid(PC~name, scale = "free_x") + ggtitle("PC by batch") +
+  #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  # print(batch_pca_plot)
+### TODO  saveRDS(batch_pca_plot, file="batch_pca_plot.rds")
 }
 
 ###############################################################################
@@ -807,15 +816,17 @@ if (length(colnames(s)) > 1) {
 
 ##################### (FILTERED) PCA PLOTS ####################################
 
-components <- getComponents(pca_res, seq_len(5))
-components <- components[!is.na(components)]
+# components <- getComponents(pca_res, seq_len(5))
+# components <- components[!is.na(components)]
+# 
+# pair <- pairsplot(pca_res, colby = "condition", components = components)
+# 
+# scree <- screeplot(pca_res, axisLabSize = 18, titleLabSize = 22)
+# 
+# print(pair)
+# print(scree)
 
-pair <- pairsplot(pca_res, colby = "condition", components = components)
-
-scree <- screeplot(pca_res, axisLabSize = 18, titleLabSize = 22)
-
-print(pair)
-print(scree)
+### TODO add filtered PCA
 
 ###############################################################################
 
@@ -825,14 +836,32 @@ print(scree)
 
 ##################### WRITE PDF ###############################################
 
-dev.off()
+# dev.off()
+
+###############################################################################
+
+
+##################### HTML Report #############################################
+
+template <- paste0(snakemake@scriptdir, "/QCReport.Rmd")
+folder <- getwd()
+
+outfile_global = paste0(folder, "/", outfile)
+
+message(outfile_global)
+
+rmarkdown::render(
+  input = template,
+  params = list(results = folder, min_assigned_read_count = min_assigned_read_count),
+  output_file = outfile_global
+)
 
 ###############################################################################
 
 
 ##################### WRITE DATA ##############################################
 
-outfile <- gsub(".pdf", "", outfile)
+outfile <- gsub(".html", "", outfile)
 
 deb <- 1
 message(paste0("output ", deb)); deb <- deb + 1
@@ -933,8 +962,6 @@ write.table(tr_geTMM_counts, paste0(outfile, ".transcripts.geTMM.normalized.tsv"
             sep = "\t", quote = FALSE,
             col.names = TRUE, row.names = TRUE, append = FALSE)
 message(paste0("output ", deb)); deb <- deb + 1
-
-
 
 ###############################################################################
 

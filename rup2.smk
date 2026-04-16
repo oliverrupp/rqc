@@ -26,7 +26,7 @@ def get_inputs(plant, type):
 
 rule report:
     input:
-        expand('{plant}/{plant}.report.pdf', plant=PLANTS)
+        expand('{plant}/{plant}.report.html', plant=PLANTS)
 
 
 
@@ -458,7 +458,7 @@ rule plant_bam:
 
 
 
-rule report_pdf:
+rule report_html:
     input:
         '{plant}/reference/samples.tsv',
         lambda wildcards: get_inputs(wildcards.plant, "trimmed"),
@@ -466,7 +466,7 @@ rule report_pdf:
         lambda wildcards: get_inputs(wildcards.plant, "salmon_rrna"),
         lambda wildcards: get_inputs(wildcards.plant, "salmon_quantiles")
     output:
-        report='{plant}/{plant}.report.pdf'
+        report='{plant}/{plant}.report.html'
     conda: "envs/R.yaml"
     threads: 1
     params: reads=1000000

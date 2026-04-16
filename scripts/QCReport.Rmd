@@ -1,0 +1,222 @@
+---
+title: "RNAseq QC Report"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    
+params:
+  results: null
+  min_assigned_read_count: null
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(ggplot2)
+library(plotly)
+library(DT)
+```
+
+Read Count Analysis
+=====================================
+
+Column {data-width=650}
+-------------------------------------
+
+### Read count analysis
+
+```{r}
+results <- readRDS(paste0(params$results, "/results/rds/reads_plot.Rds"))
+min_assigned_read_count <- params$min_assigned_read_count
+
+reads_plot <- ggplot(results, aes(x = sample, y = reads, fill = status)) +
+  geom_hline(yintercept=c(min_assigned_read_count, 50e6)) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(
+    	breaks = function(x) {
+      		default_breaks <- extended_breaks()(x)
+      		sort(c(default_breaks, min_assigned_read_count))
+    	},
+    	labels = function(breaks) {
+     		ifelse(breaks == min_assigned_read_count, paste0("cutoff: ", min_assigned_read_count), breaks)
+    	}
+  ) + 
+  theme(text = element_text(size = 18)) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))
+
+ggplotly(reads_plot)
+```
+
+
+Column {data-width=350}
+-------------------------------------
+
+### Read count analysis
+
+```{r}
+datatable(results)
+```
+
+
+
+Read Assignment Analysis
+=====================================
+
+Column {data-width=650}
+-------------------------------------
+
+### Read Assignment Analysis
+
+```{r}
+dfm <- readRDS(paste0(params$results, "/results/rds/gene_coverage_plot.Rds"))
+
+gcp_colors <- c("#e0e0e0", "#faa39d", "#dbc160", "#00BA38")
+names(gcp_colors) <- levels(dfm$variable)
+
+gene_coverage_plot <- ggplot(dfm, aes(x = Replicate,
+                                      y = value,
+                                      fill = variable)) +
+  geom_bar(stat = "identity") +
+  ylab("Number of Genes") + xlab("Samples") +
+  guides(fill = guide_legend(title = "Number of assigned reads")) +
+  theme(text = element_text(size = 18)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0)) +
+  facet_wrap(~Sample, scale = "free_x") +
+  scale_fill_manual(values = gcp_colors)
+
+ggplotly(gene_coverage_plot)
+
+```
+
+
+Gene Body Coverage
+=====================================
+
+Column {data-width=650}
+-------------------------------------
+
+### RNA degradation (gene body coverage)
+
+```{r}
+d <- readRDS(paste0(params$results, "/results/rds/genebody_coverage.Rds"))
+deg_matrix <- d$matrix
+ccols = d$colors
+skewclass = d$skewclass
+cclass = d$cclass
+
+deg_matrix_sorted <- deg_matrix[order(skewclass), ]
+cclass_sorted <- cclass[order(skewclass), , drop = FALSE]
+
+heatmaply::heatmaply(
+  as.matrix(deg_matrix_sorted),
+  dendrogram = "none",          # cluster_rows/cols = FALSE
+  row_side_colors = cclass_sorted,     # annotation_row
+  fontsize_row = 12,
+  fontsize_col = 12,
+  colors = colorRampPalette(rev(RColorBrewer::brewer.pal(11, "RdYlBu")))(100),
+  colorbar_title = "coverage (%)"
+) %>% plotly::layout(legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.1, yanchor = "top"))
+```
+
+
+Size Factor QC
+=====================================
+
+Column {.tabset data-width=500}
+-------------------------------------
+
+### Size Factor QC
+#### (see https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html)
+
+```{r}
+df <- readRDS(paste0(params$results, "/results/rds/split_factor_plot.Rds"))
+
+factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
+    geom_vline(xintercept=0) + geom_density() + theme_bw()
+ggplotly(factor_plot)
+
+```
+
+### by Condition
+
+```{r}
+split_factor_plot <- ggplot(df, aes(ratios, group = replicate, col = sample)) + 
+    geom_vline(xintercept=0) + geom_density() + theme_bw() + facet_wrap(~sample)
+
+ggplotly(split_factor_plot)
+
+```
+
+
+
+Sample Correlation
+=====================================
+
+Column {data-width=1000}
+-------------------------------------
+
+### Sample Correlation Heatmap of VST counts 
+
+```{r}
+d <- readRDS(paste0(params$results, "/results/rds/correlation_hm.Rds"))
+
+sample_cor <- d$sample_cor
+a = d$a 
+
+heatmaply::heatmaply(
+  sample_cor,
+  fontsize_row = 12,
+  fontsize_col = 12,
+  row_side_colors = a,
+  dendrogram = "row",
+  colors = colorRampPalette(rev(RColorBrewer::brewer.pal(11, "RdYlBu")))(100)
+)  %>% plotly::layout(legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.1, yanchor = "top"))
+```
+
+
+Sample PCA
+=====================================
+
+Column {.tabset data-width=1000}
+-------------------------------------
+
+### PC1 vs PC2
+
+```{r}
+pca_res = readRDS(paste0(params$results, "/results/rds/pca_res.Rds"))
+
+# scores (samples)
+scores <- as.data.frame(pca_res$rotated)
+scores$sample <- rownames(scores)
+
+# add metadata
+scores <- cbind(scores, pca_res$metadata)
+
+pca_plot <- ggplot(scores, aes(x = PC1, y = PC2, color = condition)) +
+  geom_point(size = 3) +
+  labs(
+    x = paste0("PC1 (", round(pca_res$variance["PC1"], 1), "%)"),
+    y = paste0("PC2 (", round(pca_res$variance["PC2"], 1), "%)")
+  ) +
+  theme_bw()
+
+ggplotly(pca_plot)
+```
+
+### PCA Pairs plot
+
+```{r}
+scores <- as.data.frame(pca_res$rotated[, 1:5])
+scores <- cbind(scores, pca_res$metadata)
+
+p = ggpairs(
+  scores,
+  columns = 1:5,
+  aes(color = condition),
+  upper = list(continuous = "points"),
+  lower = list(continuous = "points"),
+  diag = list(continuous = "densityDiag")
+)
+
+ggplotly(p)
+```
