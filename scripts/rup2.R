@@ -691,6 +691,123 @@ if(nrow(outliers) > 0) {
 ###############################################################################
 
 
+
+##### PCA OUTLIER #####
+
+
+
+group_by_distance <- function(v, max_dist) {
+    if(length(v) >= 2) {
+        d <- dist(v)
+        hc <- hclust(d, method = "single")
+        cutree(hc, h = max_dist)
+    } else {
+        c(1)
+    }
+}
+
+
+condition <- "EC_Q"
+condition <- "EC_Callus_AA"
+pc <- 1
+
+pc95 <- min(length(pca_res$variance), 6) #sum(cumsum(pca_res$variance) < 75)
+outliers <- data.frame(sample = character(), pc = integer())
+dns_values <- data.frame(x = double(), y = double(), pc = character())
+peaks <- data.frame(peak = double(), pc = character)
+
+for(pc in 1:pc95) {
+    dst <- c()
+    for(condition in unique(colData(se)$condition)) {
+        if(sum(colData(se)$condition == condition) > 0) {
+            points <- pca_res$rotated[colnames(se)[colData(se)$condition == condition],][pc]
+            dst <- c(dst, as.vector(dist(points[,1])))
+        }
+    }
+
+    peak <- 1000
+
+    if(length(dst) > 1) {
+        dns <- density(dst)
+        peak <- dns$x[which.max(dns$y)]
+
+        pcid = sprintf("PC%d [%.2f]", pc, peak)
+        dns_values <- rbind(dns_values, data.frame(x = dns$x, y = dns$y, pc = pcid))
+        peaks <- rbind(peaks, data.frame(peak = peak, pc = pcid))
+    }
+    
+    message(peak)
+    
+    for(condition in unique(colData(se)$condition)) {
+        if(sum(colData(se)$condition == condition) > 0) {
+            points <- pca_res$rotated[colnames(se)[colData(se)$condition == condition],][pc]
+        
+            clstr <- group_by_distance(points[,1], 3*peak)
+
+            names(clstr) <- rownames(points)
+        
+            outlier <- names(clstr)[clstr != names(which.max(table(clstr)))]
+
+            if(length(outlier) > 0) {
+                outliers <- rbind(outliers, data.frame(sample = outlier, pc = pc))
+            }
+        }
+    }
+}
+
+if(nrow(outliers) > 0) {
+    outliers$val <- "+"
+    outlier_df <- as.data.frame(pivot_wider(outliers, id_cols = sample, names_from = pc, values_from = val, values_fill = "-"))
+
+    outlier_df <- cbind(outlier_df, s[outlier_df$sample,])
+    
+    write.table(outlier_df, "PCA_outlier_PC1-5.tsv", sep="\t", quote=F, row.names = F)
+
+    g <- ggplot(dns_values, aes(x=x, y=y)) +
+        geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") +
+        geom_line() +
+        xlab("inner sample PCA distance") + 
+        facet_wrap(~pc)
+
+    saveRDS(g, file="pca_outlier.rds")
+    print(g)
+
+    outlier_ids <- unique(outliers$sample)
+    all_samples <- rownames(s[s$condition %in% unique(s[outlier_ids,,drop=F]$condition),,drop=F])
+    
+    pca_data = as.data.frame(pca_res$rotated[all_samples,1:pc95])
+
+    rownames_to_column(pca_data, "samples") %>%
+        pivot_longer(cols=-samples, names_to = "PC", values_to = "rot") -> pca_data
+
+    pca_data$condition <- s[pca_data$samples,,drop=FALSE]$condition
+
+    outliers$pc = paste0("PC", outliers$pc)
+    colnames(outliers) = c("samples", "PC")
+
+    pca_data %>% semi_join(outliers, by = c("samples", "PC")) -> outlier_data
+
+    variance <- sprintf("%.2f%%", pca_res$variance)[1:pc95]
+    names(variance) = paste0("PC", 1:pc95)
+
+    pca_data$PC = paste(pca_data$PC, " [", variance[pca_data$PC], "]", sep="")
+    outlier_data$PC = paste(outlier_data$PC, " [", variance[outlier_data$PC], "]", sep="")
+    
+    g <- ggplot(pca_data, aes(x = condition, y = rot)) +
+        geom_point() + ggtitle("PCA outlier") + 
+        geom_label(data=outlier_data, aes(label=samples), hjust = 0) +
+        geom_point(data=outlier_data, col="red", size=2) +
+        facet_wrap(~PC)
+    saveRDS(g, file="pca_outlier_2.rds")
+    #pdf("~/outlier.pdf", w = 24, h = 16) 
+    print(g)
+    #dev.off()
+}
+
+
+###############################################################################
+
+
 if (length(colnames(s)) > 1) {
   pc <- pca_res$rotated[,1:5]
   pc <- rownames_to_column(pc, "sample")

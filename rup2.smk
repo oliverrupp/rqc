@@ -469,7 +469,7 @@ rule report_html:
         report='{plant}/{plant}.report.html'
     conda: "envs/R.yaml"
     threads: 1
-    params: reads=1000000
+    params: reads=config.get("reads", 10000000)
     script: "scripts/rup2.R"
 
 
