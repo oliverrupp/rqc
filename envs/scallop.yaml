@@ -1,0 +1,6 @@
+name: scallop
+channels:
+  - bioconda
+dependencies:
+  - scallop2
+  - stringtie 
