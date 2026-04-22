@@ -15,7 +15,7 @@ library(flexdashboard)
 library(ggplot2)
 library(plotly)
 library(DT)
-```
+``` 
 
 Read Count Analysis
 =====================================
@@ -41,7 +41,6 @@ reads_plot <- ggplot(results, aes(x = sample, y = reads, fill = status)) +
      		ifelse(breaks == min_assigned_read_count, paste0("cutoff: ", min_assigned_read_count), breaks)
     	}
   ) + 
-  theme(text = element_text(size = 18)) + 
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
 ggplotly(reads_plot)
@@ -79,12 +78,11 @@ gene_coverage_plot <- ggplot(dfm, aes(x = Replicate,
   geom_bar(stat = "identity") +
   ylab("Number of Genes") + xlab("Samples") +
   guides(fill = guide_legend(title = "Number of assigned reads")) +
-  theme(text = element_text(size = 18)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 0)) +
   facet_wrap(~Sample, scale = "free_x") +
   scale_fill_manual(values = gcp_colors)
 
-ggplotly(gene_coverage_plot)
+ggplotly(gene_coverage_plot, height = 800)
 
 ```
 
@@ -107,12 +105,16 @@ cclass = d$cclass
 deg_matrix_sorted <- deg_matrix[order(skewclass), ]
 cclass_sorted <- cclass[order(skewclass), , drop = FALSE]
 
+flat_p <- do.call(c, ccols)
+for (col in names(cclass_sorted)) {
+  cclass_sorted[[col]] <- paste0(col, ".", cclass_sorted[[col]])
+}
+
 heatmaply::heatmaply(
   as.matrix(deg_matrix_sorted),
-  dendrogram = "none",          # cluster_rows/cols = FALSE
-  row_side_colors = cclass_sorted,     # annotation_row
-  fontsize_row = 12,
-  fontsize_col = 12,
+  dendrogram = "none",
+  row_side_colors = cclass_sorted,
+  row_side_palette = flat_p,
   colors = colorRampPalette(rev(RColorBrewer::brewer.pal(11, "RdYlBu")))(100),
   colorbar_title = "coverage (%)"
 ) %>% plotly::layout(legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.1, yanchor = "top"))
@@ -163,12 +165,12 @@ d <- readRDS(paste0(params$results, "/results/rds/correlation_hm.Rds"))
 sample_cor <- d$sample_cor
 a = d$a 
 
+col_order <- hclust(dist(sample_cor))$order
+
 heatmaply::heatmaply(
   sample_cor,
-  fontsize_row = 12,
-  fontsize_col = 12,
   row_side_colors = a,
-  dendrogram = "row",
+  col_side_colors = a,
   colors = colorRampPalette(rev(RColorBrewer::brewer.pal(11, "RdYlBu")))(100)
 )  %>% plotly::layout(legend = list(orientation = "h", x = 0.5, xanchor = "center", y = -0.1, yanchor = "top"))
 ```

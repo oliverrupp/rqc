@@ -19,6 +19,8 @@ def get_inputs(plant, type):
                         yield("{plant}/results/trimmed/{sample}.json").format(plant=p[0], sample=p[1])
                     case "bam":
                         yield("{plant}/results/bam/{sample}/STARAligned.sorted.bam").format(plant=p[0], sample=p[1])
+                    case "gtf":
+                        yield("{plant}/results/scallop/{sample}/scallop.gtf").format(plant=p[0], sample=p[1])
                     case _:
                         yield("{plant}/results/{type}/{sample}/quant.sf").format(plant=p[0], type=type, sample=p[1])
 
@@ -138,6 +140,20 @@ rule sort_bam:
             """
 
 
+rule scallop:
+    input: "{plant}/results/bam/{sample}/STARAligned.sorted.bam"
+    output: "{plant}/results/scallop/{sample}/scallop.gtf"
+    threads: 1
+    resources:
+        mem_mb=32000,
+        runtime=360,
+        nodes=1,
+        cpus_per_task=1
+    conda: "envs/scallop.yaml"
+    shell: """
+            scallop2 -i {input} -o {output} --threads {threads} --verbose 0
+           """
+           
 
 rule star_index:
     input:
@@ -456,7 +472,25 @@ rule plant_bam:
     output: "{plant}/.bam_done"
     shell: """ touch {output} """
 
+           
 
+rule assembly:
+    input:
+        gtf=lambda wildcards: get_inputs(wildcards.plant, "gtf"),
+        reference="{plant}/reference/annotation.gtf"
+    output: "{plant}/results/scallop.gtf"
+    threads: 12
+    resources:
+        mem_mb=15000,
+        runtime=360,
+        nodes=1,
+        cpus_per_task=12
+    conda: "envs/scallop.yaml"
+    shell: """
+           stringtie --merge -o {output} -G {input.reference} -p 12 --fr --conservative {input.gtf}
+           """
+    
+           
 
 rule report_html:
     input:

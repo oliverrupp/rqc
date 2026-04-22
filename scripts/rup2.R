@@ -763,14 +763,14 @@ if(nrow(outliers) > 0) {
     
     write.table(outlier_df, "PCA_outlier_PC1-5.tsv", sep="\t", quote=F, row.names = F)
 
-    g <- ggplot(dns_values, aes(x=x, y=y)) +
-        geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") +
-        geom_line() +
-        xlab("inner sample PCA distance") + 
-        facet_wrap(~pc)
-
-    saveRDS(g, file="pca_outlier.rds")
-    print(g)
+    # g <- ggplot(dns_values, aes(x=x, y=y)) +
+    #     geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") +
+    #     geom_line() +
+    #     xlab("inner sample PCA distance") + 
+    #     facet_wrap(~pc)
+    # print(g)
+### TODO    saveRDS(g, file="pca_outlier.rds")
+    
 
     outlier_ids <- unique(outliers$sample)
     all_samples <- rownames(s[s$condition %in% unique(s[outlier_ids,,drop=F]$condition),,drop=F])
@@ -793,15 +793,14 @@ if(nrow(outliers) > 0) {
     pca_data$PC = paste(pca_data$PC, " [", variance[pca_data$PC], "]", sep="")
     outlier_data$PC = paste(outlier_data$PC, " [", variance[outlier_data$PC], "]", sep="")
     
-    g <- ggplot(pca_data, aes(x = condition, y = rot)) +
-        geom_point() + ggtitle("PCA outlier") + 
-        geom_label(data=outlier_data, aes(label=samples), hjust = 0) +
-        geom_point(data=outlier_data, col="red", size=2) +
-        facet_wrap(~PC)
-    saveRDS(g, file="pca_outlier_2.rds")
-    #pdf("~/outlier.pdf", w = 24, h = 16) 
-    print(g)
-    #dev.off()
+    # g <- ggplot(pca_data, aes(x = condition, y = rot)) +
+    #     geom_point() + ggtitle("PCA outlier") + 
+    #     geom_label(data=outlier_data, aes(label=samples), hjust = 0) +
+    #     geom_point(data=outlier_data, col="red", size=2) +
+    #     facet_wrap(~PC)
+    # print(g)
+    
+### TODO    saveRDS(g, file="pca_outlier_2.rds")
 }
 
 
