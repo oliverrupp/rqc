@@ -208,12 +208,13 @@ ggplotly(pca_plot)
 ### PCA Pairs plot
 
 ```{r}
-scores <- as.data.frame(pca_res$rotated[, 1:5])
+minpc <- min(ncol(pca_res$rotated), 5)
+scores <- as.data.frame(pca_res$rotated[, 1:minpc])
 scores <- cbind(scores, pca_res$metadata)
 
 p = ggpairs(
   scores,
-  columns = 1:5,
+  columns = 1:minpc,
   aes(color = condition),
   upper = list(continuous = "points"),
   lower = list(continuous = "points"),
