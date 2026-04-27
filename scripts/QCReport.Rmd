@@ -26,7 +26,7 @@ Column {data-width=650}
 ### Read count analysis
 
 ```{r reads_plot}
-results <- readRDS(paste0(params$results, "/results/rds/reads_plot.Rds"))
+results <- readRDS(paste0(params$results, "/results/rds/reads_plot.rds"))
 min_assigned_read_count <- params$min_assigned_read_count
 
 reads_plot <- ggplot(results, aes(x = sample, y = reads, fill = status)) +
@@ -78,7 +78,11 @@ heatmaply::heatmaply(mat, dendrogram = "none",
 ### Read Assignment Analysis
 
 ```{r gene_coverage}
-dfm <- readRDS(paste0(params$results, "/results/rds/gene_coverage_plot.Rds"))
+dfmdet <- readRDS(paste0(params$results, "/results/rds/gene_coverage_plot.rds"))
+
+dfm <- dfmdet$dfm
+detected <- dfmdet$detected
+detected2 <- dfmdet$detected2
 
 gcp_colors <- c("#e0e0e0", "#faa39d", "#dbc160", "#00BA38")
 names(gcp_colors) <- levels(dfm$variable)
@@ -86,6 +90,7 @@ names(gcp_colors) <- levels(dfm$variable)
 gene_coverage_plot <- ggplot(dfm, aes(x = Replicate,
                                       y = value,
                                       fill = variable)) +
+  geom_hline(yintercept = c(detected, detected2)) +
   geom_bar(stat = "identity") +
   ylab("Number of Genes") + xlab("Samples") +
   guides(fill = guide_legend(title = "Number of assigned reads")) +
@@ -107,7 +112,7 @@ Column {data-width=650}
 ### RNA degradation (gene body coverage)
 
 ```{r genebody_coverage}
-d <- readRDS(paste0(params$results, "/results/rds/genebody_coverage.Rds"))
+d <- readRDS(paste0(params$results, "/results/rds/genebody_coverage.rds"))
 deg_matrix <- d$matrix
 ccols = d$colors
 skewclass = d$skewclass
@@ -143,7 +148,7 @@ Column {.tabset data-width=500}
 #### (see https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html)
 
 ```{r factor_plot}
-df <- readRDS(paste0(params$results, "/results/rds/split_factor_plot.Rds"))
+df <- readRDS(paste0(params$results, "/results/rds/split_factor_plot.rds"))
 
 factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
     geom_vline(xintercept=0) + geom_density() + theme_bw()
@@ -172,7 +177,7 @@ Column {data-width=1000}
 ### Sample Correlation Heatmap of VST counts 
 
 ```{r sample_correlation}
-d <- readRDS(paste0(params$results, "/results/rds/correlation_hm.Rds"))
+d <- readRDS(paste0(params$results, "/results/rds/correlation_hm.rds"))
 
 sample_cor <- d$sample_cor
 a = d$a 
@@ -197,7 +202,7 @@ Column {.tabset data-width=1000}
 ### PC1 vs PC2
 
 ```{r PCA}
-pca_res = readRDS(paste0(params$results, "/results/rds/pca_res.Rds"))
+pca_res = readRDS(paste0(params$results, "/results/rds/pca_res.rds"))
 
 # scores (samples)
 scores <- as.data.frame(pca_res$rotated)

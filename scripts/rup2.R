@@ -164,7 +164,7 @@ results$status <- factor(results$status,
 #   theme(text = element_text(size = 18)) + ggtitle("Read count analysis") +
 #   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
-saveRDS(results, "results/rds/reads_plot.Rds")
+saveRDS(results, "results/rds/reads_plot.rds")
 
 # print(reads_plot)
 
@@ -274,6 +274,8 @@ unlock(mtx)
 
 ###############################################################################
 
+
+
 ##################### READS/GENE COUNT COMPARISON #############################
 
 cols <- colnames(gene_count_matrix)
@@ -288,7 +290,10 @@ for (i in 1:n) {
   }
 }
 
-mat <- mat/nrow(gene_count_matrix)
+detected <- sum(rowMax(gene_count_matrix) >= cutoff)
+detected2 <- sum(rowMax(gene_count_matrix) >= 10)
+
+mat <- mat/detected
 
 saveRDS(mat, file="results/rds/read_count_comp.rds")
 
@@ -378,7 +383,8 @@ dfm$Replicate <- factor(dfm$Replicate, levels = sorted_names)
 #   facet_wrap(~Sample, scale = "free_x") +
 #   scale_fill_manual(values = gcp_colors)
 
-saveRDS(dfm, file="results/rds/gene_coverage_plot.Rds")
+
+saveRDS(list(dfm=dfm, detected=detected, detected2=detected2), file="results/rds/gene_coverage_plot.rds")
 
 # print(gene_coverage_plot)
 
@@ -485,7 +491,7 @@ if (length(colnames(s)) > 1) {
 
 deg_matrix <- deg_matrix[rev(order(skewness)),]
 
-saveRDS(list(matrix = deg_matrix, colors = ccols, skewclass = skewclass, cclass = cclass), "results/rds/genebody_coverage.Rds")
+saveRDS(list(matrix = deg_matrix, colors = ccols, skewclass = skewclass, cclass = cclass), "results/rds/genebody_coverage.rds")
 
 # ComplexHeatmap::pheatmap(as.matrix(deg_matrix), cluster_rows = FALSE, cluster_cols = FALSE,
 #                          annotation_row = cclass, annotation_colors = ccols,
@@ -532,7 +538,7 @@ df$sample = sample_info[df$replicate,]$condition
 # 
 # print(split_factor_plot)
 
-saveRDS(df, file="results/rds/split_factor_plot.Rds")
+saveRDS(df, file="results/rds/split_factor_plot.rds")
 
 ###############################################################################
 
@@ -583,7 +589,7 @@ if (length(colnames(s)) > 1) {
 #                    annotation_colors = ccols,
 #                    main = "Sample Correlation Heatmap of VST counts")
 
-saveRDS(list(sample_cor = sample_cor, a = a, ccols = ccols), "results/rds/correlation_hm.Rds")
+saveRDS(list(sample_cor = sample_cor, a = a, ccols = ccols), "results/rds/correlation_hm.rds")
 
 #######################################
 
@@ -591,7 +597,7 @@ saveRDS(list(sample_cor = sample_cor, a = a, ccols = ccols), "results/rds/correl
 ### PCA ####
 
 pca_res <- pca(cor_data, metadata = colData(se))
-saveRDS(pca_res, "results/rds/pca_res.Rds")
+saveRDS(pca_res, "results/rds/pca_res.rds")
 
 # biplot(pca_res, x = "PC2", y = "PC1",
 #        colby = "condition", title = "PCA of VST counts")
