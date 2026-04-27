@@ -25,7 +25,7 @@ Column {data-width=650}
 
 ### Read count analysis
 
-```{r}
+```{r reads_plot}
 results <- readRDS(paste0(params$results, "/results/rds/reads_plot.Rds"))
 min_assigned_read_count <- params$min_assigned_read_count
 
@@ -61,12 +61,23 @@ datatable(results)
 Read Assignment Analysis
 =====================================
 
-Column {data-width=650}
+Column {.tabset data-width=650}
 -------------------------------------
+
+### Read Assignment Comparison
+
+```{r read_count_comp}
+mat <- readRDS(paste0(params$results, "/results/rds/read_count_comp.rds"))
+
+heatmaply::heatmaply(mat, dendrogram = "none", 
+                     limits = c(0,1),
+                     colors = colorRampPalette(rev(RColorBrewer::brewer.pal(11, "RdYlBu")))(100))
+```
+
 
 ### Read Assignment Analysis
 
-```{r}
+```{r gene_coverage}
 dfm <- readRDS(paste0(params$results, "/results/rds/gene_coverage_plot.Rds"))
 
 gcp_colors <- c("#e0e0e0", "#faa39d", "#dbc160", "#00BA38")
@@ -95,7 +106,7 @@ Column {data-width=650}
 
 ### RNA degradation (gene body coverage)
 
-```{r}
+```{r genebody_coverage}
 d <- readRDS(paste0(params$results, "/results/rds/genebody_coverage.Rds"))
 deg_matrix <- d$matrix
 ccols = d$colors
@@ -113,6 +124,7 @@ for (col in names(cclass_sorted)) {
 heatmaply::heatmaply(
   as.matrix(deg_matrix_sorted),
   dendrogram = "none",
+  show_dendrogram = c(FALSE, FALSE),
   row_side_colors = cclass_sorted,
   row_side_palette = flat_p,
   colors = colorRampPalette(rev(RColorBrewer::brewer.pal(11, "RdYlBu")))(100),
@@ -130,7 +142,7 @@ Column {.tabset data-width=500}
 ### Size Factor QC
 #### (see https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html)
 
-```{r}
+```{r factor_plot}
 df <- readRDS(paste0(params$results, "/results/rds/split_factor_plot.Rds"))
 
 factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
@@ -141,7 +153,7 @@ ggplotly(factor_plot)
 
 ### by Condition
 
-```{r}
+```{r split_factor_plot}
 split_factor_plot <- ggplot(df, aes(ratios, group = replicate, col = sample)) + 
     geom_vline(xintercept=0) + geom_density() + theme_bw() + facet_wrap(~sample)
 
@@ -159,7 +171,7 @@ Column {data-width=1000}
 
 ### Sample Correlation Heatmap of VST counts 
 
-```{r}
+```{r sample_correlation}
 d <- readRDS(paste0(params$results, "/results/rds/correlation_hm.Rds"))
 
 sample_cor <- d$sample_cor
@@ -184,7 +196,7 @@ Column {.tabset data-width=1000}
 
 ### PC1 vs PC2
 
-```{r}
+```{r PCA}
 pca_res = readRDS(paste0(params$results, "/results/rds/pca_res.Rds"))
 
 # scores (samples)
@@ -207,7 +219,7 @@ ggplotly(pca_plot)
 
 ### PCA Pairs plot
 
-```{r}
+```{r PCA_pairs}
 minpc <- min(ncol(pca_res$rotated), 5)
 scores <- as.data.frame(pca_res$rotated[, 1:minpc])
 scores <- cbind(scores, pca_res$metadata)
@@ -223,3 +235,47 @@ p = ggpairs(
 
 ggplotly(p)
 ```
+
+
+
+PCA outlier
+=====================================
+
+Column {.tabset data-width=1000}
+-------------------------------------
+
+### PCA Outlier
+
+```{r pca_outlier}
+  pca_obj <- readRDS(paste0(params$results, "/results/rds/pca_outlier_2.rds"))
+
+  pca_data <- pca_obj$pca_data
+  outlier_data <- pca_obj$outlier_data
+
+  pca_outlier <- ggplot(pca_data, aes(x = condition, y = rot)) +
+        geom_point(size=0.5)  +
+        geom_label(data=outlier_data, aes(label=samples), hjust = 0) +
+        geom_point(data=outlier_data, col="red", size=0.5) +
+        facet_wrap(~PC)
+  
+  ggplotly(pca_outlier)
+```
+
+
+### PCA Sample Distance
+
+```{r pca_intra_sample_dist}
+pca_obj <- readRDS(paste0(params$results, "/results/rds/pca_outlier.rds"))
+
+dns_values <- pca_obj$dns_values
+peaks <- pca_obj$peaks
+
+intra_sample_dist <- ggplot(dns_values, aes(x=x, y=y)) +
+    geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") +
+    geom_line() +
+    xlab("intra sample PCA distance") +
+    facet_wrap(~pc)
+ggplotly(intra_sample_dist)
+```
+
+

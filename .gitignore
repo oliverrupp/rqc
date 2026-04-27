@@ -5,3 +5,5 @@
 rup2.Rproj
 *~
 .snakemake
+.positai
+data
