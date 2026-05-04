@@ -22,6 +22,7 @@ suppressMessages(library(PCAtools))
 suppressMessages(library(xlsx))
 suppressMessages(library(filelock))
 suppressMessages(library(scales))
+suppressMessages(library(stringr))
 
 #### setwd("/home/orupp/Projects/trqc/CS")
 
@@ -37,7 +38,7 @@ spec <- matrix(c(
   "datafolder", "d", 1, "character",
   "reads", "r", 1, "integer",
   "correlation", "c", 1, "double",
-  "help", "h", 0, ""
+  "help", "h", 0, "logical"
 ), byrow = TRUE, ncol = 4)
 opt <- getopt(spec)
 
@@ -85,6 +86,54 @@ message(sample_info)
 ###############################################################################
 
 
+##################### FALCO QC REPORT #########################################
+
+# ── PARSERS ───────────────────────────────────────────────────────────────────
+read_falco <- function(path) {
+  con   <- gzcon(file(path, "rb"))
+  lines <- readLines(con, warn = FALSE); close(con)
+  sec_idx <- grep("^>>", lines)
+  secs    <- list()
+  for (i in seq_along(sec_idx)) {
+    hdr <- lines[sec_idx[i]]
+    if (hdr == ">>END_MODULE") next
+    end <- if (i < length(sec_idx)) sec_idx[i+1]-1 else length(lines)
+    body <- lines[(sec_idx[i]+1):end]
+    body <- body[!grepl("^>>END_MODULE", body)]
+    nm   <- str_remove(hdr, "^>>") |> str_remove("\\s+(pass|warn|fail)$") |> str_trim()
+    st   <- str_extract(hdr, "(pass|warn|fail)$")
+    secs[[nm]] <- list(status = st %||% "unknown", lines = body)
+  }
+  secs
+}
+
+parse_basic <- function(sec) {
+  ls <- sec$lines[!grepl("^#", sec$lines)]
+  m  <- str_split_fixed(ls, "\t", 2)
+  setNames(m[,2], m[,1])
+}
+
+parse_table <- function(sec) {
+  hi <- tail(grep("^#", sec$lines), 1); if (is.na(hi)) return(NULL)
+  hd <- str_remove(sec$lines[hi], "^#") |> str_split("\t") |> unlist()
+  dl <- sec$lines[(hi+1):length(sec$lines)]; dl <- dl[nzchar(dl)]
+  if (!length(dl)) return(NULL)
+  mat <- str_split_fixed(dl, "\t", length(hd))
+  df  <- as.data.frame(mat, stringsAsFactors = FALSE)
+  colnames(df) <- make.names(hd); df
+}
+
+
+# ── LOAD DATA ─────────────────────────────────────────────────────────────────
+
+falco_dir <- "results/falco"
+falco_files <- list.files(falco_dir, "\\.gz$", recursive = TRUE, full.names = TRUE)
+sample_names <- gsub("\\.f(ast|)q\\.gz$", "", basename(falco_files))
+all_data <- setNames(lapply(falco_files, read_falco), sample_names)
+
+saveRDS(all_data, file="results/rds/falco_qc.rds")
+
+###############################################################################
 
 
 
@@ -607,8 +656,6 @@ saveRDS(pca_res, "results/rds/pca_res.rds")
 
 
 ##### PCA OUTLIER #####
-
-
 
 group_by_distance <- function(v, max_dist) {
     if(length(v) >= 2) {

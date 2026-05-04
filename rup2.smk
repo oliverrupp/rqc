@@ -25,9 +25,21 @@ def get_inputs(plant, type):
                         yield("{plant}/results/bam/{sample}/STARAligned.sorted.bam").format(plant=p[0], sample=p[1])
                     case "gtf":
                         yield("{plant}/results/scallop/{sample}/scallop.gtf").format(plant=p[0], sample=p[1])
+                    case "qc_untrimmed":
+                        if(os.path.isfile(filetocheck_s)):
+                            yield("{plant}/results/falco/untrimmed/{sample}_s.fq.gz").format(plant=p[0], sample=p[1])
+                        else:
+                            yield("{plant}/results/falco/untrimmed/{sample}_1.fq.gz").format(plant=p[0], sample=p[1])
+                            yield("{plant}/results/falco/untrimmed/{sample}_2.fq.gz").format(plant=p[0], sample=p[1])
+                    case "qc_trimmed":
+                        if(os.path.isfile(filetocheck_s)):
+                            yield("{plant}/results/falco/trimmed/{sample}_S.fastq.gz").format(plant=p[0], sample=p[1])
+                        else:
+                            yield("{plant}/results/falco/trimmed/{sample}_R1.fastq.gz").format(plant=p[0], sample=p[1])
+                            yield("{plant}/results/falco/trimmed/{sample}_R2.fastq.gz").format(plant=p[0], sample=p[1])
                     case _:
                         yield("{plant}/results/{type}/{sample}/quant.sf").format(plant=p[0], type=type, sample=p[1])
-
+                        
 
 
 rule report:
@@ -322,7 +334,32 @@ rule trim_se:
            """
 
 
+rule falco_untrimmed:
+    input: "{plant}/reads/{name}"
+    output:
+        data="{plant}/results/falco/untrimmed/{name}",
+        summary="{plant}/results/falco/untrimmed/{name}.summary"
+    threads: 1
+    conda: "envs/falco.yaml"
+    shell: """
+           falco {input} -skip-report -q \
+                 -D {output.data} -S {output.summary}
+           """
 
+    
+rule falco_trimmed:
+    input: "{plant}/results/trimmed/{name}"
+    output:
+        data="{plant}/results/falco/trimmed/{name}",
+        summary="{plant}/results/falco/trimmed/{name}.summary"
+    threads: 1
+    conda: "envs/falco.yaml"
+    shell: """
+           falco {input} -skip-report -q \
+                 -D {output.data} -S {output.summary}
+           """
+
+    
 rule salmon_pe:
     input:
         r1pe="{plant}/results/trimmed/{sample}_R1.fastq.gz",
@@ -504,7 +541,9 @@ rule report_html:
         lambda wildcards: get_inputs(wildcards.plant, "trimmed"),
         lambda wildcards: get_inputs(wildcards.plant, "salmon"),
         lambda wildcards: get_inputs(wildcards.plant, "salmon_rrna"),
-        lambda wildcards: get_inputs(wildcards.plant, "salmon_quantiles")
+        lambda wildcards: get_inputs(wildcards.plant, "salmon_quantiles"),
+        lambda wildcards: get_inputs(wildcards.plant, "qc_untrimmed"),
+        lambda wildcards: get_inputs(wildcards.plant, "qc_trimmed")
     output:
         report='{plant}/{plant}.report.html'
     conda: "envs/R.yaml"

@@ -10,6 +10,8 @@ dependencies:
  - r-ggpubr
  - r-reshape2
  - r-pheatmap
+ - r-jsonlite
+ - r-stringr
  - r-rjson
  - r-tidyverse
  - r-moments

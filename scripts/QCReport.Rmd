@@ -15,6 +15,9 @@ library(flexdashboard)
 library(ggplot2)
 library(plotly)
 library(DT)
+library(scales)
+library(GGally)
+library(jsonlite)
 ``` 
 
 Read Count Analysis
@@ -44,7 +47,7 @@ reads_plot <- ggplot(results, aes(x = sample, y = reads, fill = status)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 
 ggplotly(reads_plot)
-```
+``` 
 
 
 Column {data-width=350}
@@ -57,9 +60,240 @@ datatable(results)
 ```
 
 
+FastP Analyses
+=====================================
+
+Column {.tabset .tabset-pills}
+-------------------------------------
+
+```{r, include=FALSE}
+trimmed_path <- paste0(params$results, "/results/trimmed")
+
+files <- list.files(path = trimmed_path, pattern = "\\.json$", full.names = TRUE)
+
+fastp_list <- lapply(files, fromJSON)
+
+names(fastp_list) <- gsub(".json", "", basename(files))
+
+
+get_quality_df <- function(x, sample_name, read, stage, status, metric) {
+  df <- as.data.frame(x[[paste0("read", read, "_", stage, "_filtering")]][[metric]])
+  df$position <- seq_len(nrow(df))
+  df$sample <- sample_name
+  df$status <- status
+  df
+}
+```
+
+### Duplication
+
+```{r fastp_duplication}
+dup_df <- tibble(
+  sample = names(fastp_list),
+  duplication_rate = map_dbl(fastp_list, ~ .x$duplication$rate)
+)
+
+dupp <- ggplot(dup_df, aes(x = sample, y = duplication_rate*100)) +
+  geom_col(fill = "steelblue") +
+  labs(x = "Sample", y = "Rate")
+ggplotly(dupp)
+```
+
+### QC
+
+```{r fastp_qc}
+quality_df <- map2_dfr(fastp_list, names(fastp_list), \(x, n) {
+  rbind(
+    get_quality_df(x, n, 1, "before", "untrimmed forward", "quality_curves"),
+    get_quality_df(x, n, 2, "before", "untrimmed reverse","quality_curves"),
+    get_quality_df(x, n, 1, "after",  "trimmed forward","quality_curves"),
+    get_quality_df(x, n, 2, "after",  "trimmed reverse","quality_curves")
+  )
+})
+
+
+mqc <- ggplot(quality_df, aes(x = position, y = mean, color = sample)) +
+  geom_line(alpha = 0.7) + ylim(0, 40) + 
+  labs(x = "Position", y = "Quality score") +
+  facet_wrap(~status) 
+
+ggplotly(mqc)
+
+```
+
+### GC
+
+```{r fastp_gc}
+gc_df <- map2_dfr(fastp_list, names(fastp_list), \(x, n) {
+  rbind(
+    get_quality_df(x, n, 1, "before", "untrimmed forward", "content_curves"),
+    get_quality_df(x, n, 2, "before", "untrimmed reverse","content_curves"),
+    get_quality_df(x, n, 1, "after",  "trimmed forward","content_curves"),
+    get_quality_df(x, n, 2, "after",  "trimmed reverse","content_curves")
+  )
+})
+
+mgc <- ggplot(gc_df, aes(x = position, y = GC*100, color = sample)) +
+  geom_line(alpha = 0.7) + 
+  labs(x = "Position", y = "GC %") +
+  facet_wrap(~status) 
+ggplotly(mgc)
+
+```
+
+### Insert Size
+
+```{r fastp_insert_size}
+extract_insert_size <- function(x, sample_name) {
+  hist <- x$insert_size$histogram
+  
+  last_nonzero <- max(which(hist != 0))
+  
+  hist_trimmed <- hist[seq_len(last_nonzero)]
+  
+  tibble(
+    insert_size = seq_along(hist_trimmed),
+    count = hist_trimmed,
+    sample = sample_name
+  )
+}
+
+insert_df <- map2_dfr(fastp_list, names(fastp_list), extract_insert_size)
+
+isp <- ggplot(insert_df, aes(insert_size, count, color = sample)) +
+  geom_line(alpha = 0.7) +
+  theme_minimal() +
+  labs(x = "Insert size (bp)", y = "Read count")
+ggplotly(isp)
+```
+
+
+FastQC/Falco Analyses
+=====================================
+
+Column {.tabset .tabset-pills}
+-------------------------------------
+
+```{r read falco qc, include=FALSE}
+update_samples <- function(x) {
+  x <- x |> extract(Sample, into = c("Sample", "read"), regex = "(.+)_(R?[12])$")
+  x$read = factor(x$read)
+  levels(x$read)=c("untrimmed fwd", "untrimmed rev", "trimmed fwd", "trimmed rev")
+  x
+}
+
+all_data <- readRDS(paste0(params$results, "/results/rds/falco_qc.rds"))
+```
+
+
+### Per base sequence quality
+
+```{r Per base sequence quality}
+pbq_df <- map_dfr(names(all_data), function(s) {
+  sec <- all_data[[s]][["Per base sequence quality"]]; if(is.null(sec)) return(NULL)
+  df  <- parse_table(sec); if(is.null(df)) return(NULL)
+  df$Sample <- s; df
+}) |> mutate(Base=as.integer(str_extract(Base,"^[0-9]+")), Mean=as.numeric(Mean))
+
+pbq_df <- update_samples(pbq_df)
+
+ggplotly(ggplot(pbq_df, aes(x=Base, y=Mean, col=Sample)) + geom_line() + facet_wrap(~read, labeller = label_wrap_gen(multi_line=FALSE)))
+```
+
+
+### Per-sequence quality
+
+```{r per sequence quality}
+psq_df <- map_dfr(names(all_data), function(s) {
+  sec <- all_data[[s]][["Per sequence quality scores"]]; if(is.null(sec)) return(NULL)
+  df  <- parse_table(sec); if(is.null(df)) return(NULL)
+  df$Sample <- s; df
+}) |> mutate(Quality=as.integer(Quality), Count=as.numeric(Count))
+
+psq_df <- update_samples(psq_df)
+
+ggplotly(ggplot(psq_df, aes(x=Quality, y=Count, col=Sample)) + geom_line() + facet_wrap(~read, labeller = label_wrap_gen(multi_line=FALSE)))
+```
+
+
+### GC content
+
+```{r gc content}
+gc_df <- map_dfr(names(all_data), function(s) {
+  sec <- all_data[[s]][["Per sequence GC content"]]; if(is.null(sec)) return(NULL)
+  df  <- parse_table(sec); if(is.null(df)) return(NULL)
+  df$Sample <- s; df
+}) |> mutate(GC.Content=as.integer(GC.Content), Count=as.numeric(Count))
+
+gc_df <- update_samples(gc_df)
+
+ggplotly(ggplot(gc_df, aes(x=GC.Content, y=Count, col=Sample)) + geom_line() + facet_wrap(~read, labeller = label_wrap_gen(multi_line=FALSE)))
+```
+
+
+### Duplication levels
+
+```{r duplication level}
+dup_df <- map_dfr(names(all_data), function(s) {
+  sec <- all_data[[s]][["Sequence Duplication Levels"]]; if(is.null(sec)) return(NULL)
+  df  <- parse_table(sec); if(is.null(df)) return(NULL)
+  df$Sample <- s; df
+}) |> rename_with(~str_trim(str_replace_all(.x,"\\.+"," "))) |>
+  mutate(across(where(is.character) & !matches("Sample|Duplication"), as.numeric))
+
+dup_pct_col <- grep("dedup|Percentage", colnames(dup_df), ignore.case=TRUE, value=TRUE)[1]
+if (!is.na(dup_pct_col)) dup_df <- rename(dup_df, Pct_dedup = all_of(dup_pct_col))
+
+dup_lvl_col <- grep("Duplication Level", colnames(dup_df), ignore.case=TRUE, value=TRUE)[1]
+if (!is.na(dup_lvl_col)) dup_df <- rename(dup_df, DupLevel = all_of(dup_lvl_col))
+
+dup_df <- update_samples(dup_df)
+
+dup_df$DupLevel <- factor(dup_df$DupLevel, levels=unique(dup_df$DupLevel))
+ggplotly(ggplot(dup_df, aes(x=DupLevel, y=`Percentage of total`, col=Sample, group=Sample)) + geom_line() + facet_wrap(~read, labeller = label_wrap_gen(multi_line=FALSE)))
+``` 
+
+
+
+### Adapter content
+
+```{r adapter content}
+ac_df <- map_dfr(names(all_data), function(s) {
+  sec <- all_data[[s]][["Adapter Content"]]; if(is.null(sec)) return(NULL)
+  df  <- parse_table(sec); if(is.null(df)) return(NULL)
+  df$Sample <- s; df
+}) |> pivot_longer(-c(Position,Sample), names_to="Adapter", values_to="Pct") |>
+  mutate(Position=as.integer(str_extract(Position,"^[0-9]+")), Pct=as.numeric(Pct))
+
+ac_df <- update_samples(ac_df)
+
+ac_list <- ac_df |> group_by(Adapter) |> summarize(max = max(Pct)) |> filter(max >= 0.05) |> select(Adapter)
+
+ggplotly(ggplot(ac_df |> filter(Adapter %in% ac_list), aes(x=Position, y=Pct, col=Sample)) + geom_line() + facet_wrap(~read+Adapter, labeller = label_wrap_gen(multi_line=FALSE)))
+```
+
+
+
+
+
+
 
 Read Assignment Analysis
 =====================================
+
+Column {data-width=350}
+-------------------------------------
+
+```{r}
+dfmdet <- readRDS(paste0(params$results, "/results/rds/gene_coverage_plot.rds"))
+
+dfm <- dfmdet$dfm
+detected <- dfmdet$detected
+detected2 <- dfmdet$detected2
+
+knitr::kable(head(dfm))
+```
+
 
 Column {.tabset data-width=650}
 -------------------------------------
@@ -78,12 +312,6 @@ heatmaply::heatmaply(mat, dendrogram = "none",
 ### Read Assignment Analysis
 
 ```{r gene_coverage}
-dfmdet <- readRDS(paste0(params$results, "/results/rds/gene_coverage_plot.rds"))
-
-dfm <- dfmdet$dfm
-detected <- dfmdet$detected
-detected2 <- dfmdet$detected2
-
 gcp_colors <- c("#e0e0e0", "#faa39d", "#dbc160", "#00BA38")
 names(gcp_colors) <- levels(dfm$variable)
 
@@ -101,6 +329,9 @@ gene_coverage_plot <- ggplot(dfm, aes(x = Replicate,
 ggplotly(gene_coverage_plot, height = 800)
 
 ```
+
+
+
 
 
 Gene Body Coverage
