@@ -2,6 +2,10 @@ import os
 from itertools import product
 
 
+localrules: report, index, trim, quant, quant_rrna, quant_quantiles, gentrome, gtf, transcripts, quantiles, rrna, rrna_gtf, fai, plant_bam, init_conda, init_salmon, init_fastp, init_gffread, init_samtools, init_R
+
+
+
 (PLANTS, )=glob_wildcards('{plants}/reference/samples.tsv')
 (PLANTS2, SAMPLES, PE, )=glob_wildcards('{plants}/reads/{samples}_{s}.fq.gz')
 
@@ -295,6 +299,7 @@ rule trim_pe:
            fastp -i {input.r1} -I {input.r2} \
                  -o {output.r1pe} -O {output.r2pe} \
                  --unpaired1 {output.r1se} --unpaired2 {output.r2se} \
+                 --thread {threads} \
                  -j {output.json} -l 50 -h /dev/null
            """
 
@@ -312,6 +317,7 @@ rule trim_se:
     shell: """
            fastp -i {input.rs}  \
                  -o {output.rse}  \
+                 --thread {threadis} \
                  -j {output.json} -l 50 -h /dev/null
            """
 
@@ -503,7 +509,7 @@ rule report_html:
         report='{plant}/{plant}.report.html'
     conda: "envs/R.yaml"
     threads: 1
-    params: reads=config.get("reads", 10000000)
+    params: reads=config.get("reads", 1000000)
     script: "scripts/rup2.R"
 
 
