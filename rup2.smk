@@ -329,7 +329,7 @@ rule trim_se:
     shell: """
            fastp -i {input.rs}  \
                  -o {output.rse}  \
-                 --thread {threadis} \
+                 --thread {threads} \
                  -j {output.json} -l 50 -h /dev/null
            """
 

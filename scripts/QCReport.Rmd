@@ -78,10 +78,12 @@ names(fastp_list) <- gsub(".json", "", basename(files))
 
 get_quality_df <- function(x, sample_name, read, stage, status, metric) {
   df <- as.data.frame(x[[paste0("read", read, "_", stage, "_filtering")]][[metric]])
-  df$position <- seq_len(nrow(df))
-  df$sample <- sample_name
-  df$status <- status
-  df
+  if(nrow(df) > 0) {
+    df$position <- seq_len(nrow(df))
+    df$sample <- sample_name
+    df$status <- status
+    df
+  }
 }
 ```
 
@@ -94,8 +96,9 @@ dup_df <- tibble(
 )
 
 dupp <- ggplot(dup_df, aes(x = sample, y = duplication_rate*100)) +
-  geom_col(fill = "steelblue") +
-  labs(x = "Sample", y = "Rate")
+  geom_col(fill = "red", col="black") +
+  labs(x = "Sample", y = "Rate %") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 0))
 ggplotly(dupp)
 ```
 
@@ -145,17 +148,19 @@ ggplotly(mgc)
 
 ```{r fastp_insert_size}
 extract_insert_size <- function(x, sample_name) {
-  hist <- x$insert_size$histogram
+  if("insert_size" %in% names(x)) {
+    hist <- x$insert_size$histogram
   
-  last_nonzero <- max(which(hist != 0))
+    last_nonzero <- max(which(hist != 0))
   
-  hist_trimmed <- hist[seq_len(last_nonzero)]
+    hist_trimmed <- hist[seq_len(last_nonzero)]
   
-  tibble(
-    insert_size = seq_along(hist_trimmed),
-    count = hist_trimmed,
-    sample = sample_name
-  )
+    tibble(
+      insert_size = seq_along(hist_trimmed),
+      count = hist_trimmed,
+      sample = sample_name
+    )
+  }
 }
 
 insert_df <- map2_dfr(fastp_list, names(fastp_list), extract_insert_size)
@@ -176,10 +181,22 @@ Column {.tabset .tabset-pills}
 
 ```{r read falco qc, include=FALSE}
 update_samples <- function(x) {
-  x <- x |> extract(Sample, into = c("Sample", "read"), regex = "(.+)_(R?[12])$")
+  read_type = c("untrimmed fwd", "untrimmed rev", "trimmed fwd", "trimmed rev", "untrimmed single", "trimmed single")
+  names(read_type) = c("1", "2", "R1", "R2", "s", "S")
+  x <- x |> extract(Sample, into = c("Sample", "read"), regex = "(.+)_(R?[sS12])$")
   x$read = factor(x$read)
-  levels(x$read)=c("untrimmed fwd", "untrimmed rev", "trimmed fwd", "trimmed rev")
+  levels(x$read)=read_type[as.character(levels(x$read))]
   x
+}
+
+parse_table <- function(sec) {
+  hi <- tail(grep("^#", sec$lines), 1); if (is.na(hi)) return(NULL)
+  hd <- str_remove(sec$lines[hi], "^#") |> str_split("\t") |> unlist()
+  dl <- sec$lines[(hi+1):length(sec$lines)]; dl <- dl[nzchar(dl)]
+  if (!length(dl)) return(NULL)
+  mat <- str_split_fixed(dl, "\t", length(hd))
+  df  <- as.data.frame(mat, stringsAsFactors = FALSE)
+  colnames(df) <- make.names(hd); df
 }
 
 all_data <- readRDS(paste0(params$results, "/results/rds/falco_qc.rds"))
@@ -197,7 +214,7 @@ pbq_df <- map_dfr(names(all_data), function(s) {
 
 pbq_df <- update_samples(pbq_df)
 
-ggplotly(ggplot(pbq_df, aes(x=Base, y=Mean, col=Sample)) + geom_line() + facet_wrap(~read, labeller = label_wrap_gen(multi_line=FALSE)))
+ggplotly(ggplot(pbq_df, aes(x=Base, y=Median, group=Sample, col=Sample)) + geom_line() + facet_wrap(~read))
 ```
 
 
@@ -212,7 +229,7 @@ psq_df <- map_dfr(names(all_data), function(s) {
 
 psq_df <- update_samples(psq_df)
 
-ggplotly(ggplot(psq_df, aes(x=Quality, y=Count, col=Sample)) + geom_line() + facet_wrap(~read, labeller = label_wrap_gen(multi_line=FALSE)))
+ggplotly(ggplot(psq_df, aes(x=Quality, y=Count, col=Sample)) + geom_line() + facet_wrap(~read))
 ```
 
 
@@ -227,7 +244,7 @@ gc_df <- map_dfr(names(all_data), function(s) {
 
 gc_df <- update_samples(gc_df)
 
-ggplotly(ggplot(gc_df, aes(x=GC.Content, y=Count, col=Sample)) + geom_line() + facet_wrap(~read, labeller = label_wrap_gen(multi_line=FALSE)))
+ggplotly(ggplot(gc_df, aes(x=GC.Content, y=Count, col=Sample)) + geom_line() + facet_wrap(~read))
 ```
 
 
@@ -250,7 +267,7 @@ if (!is.na(dup_lvl_col)) dup_df <- rename(dup_df, DupLevel = all_of(dup_lvl_col)
 dup_df <- update_samples(dup_df)
 
 dup_df$DupLevel <- factor(dup_df$DupLevel, levels=unique(dup_df$DupLevel))
-ggplotly(ggplot(dup_df, aes(x=DupLevel, y=`Percentage of total`, col=Sample, group=Sample)) + geom_line() + facet_wrap(~read, labeller = label_wrap_gen(multi_line=FALSE)))
+ggplotly(ggplot(dup_df, aes(x=DupLevel, y=`Percentage of total`, col=Sample, group=Sample)) + geom_line() + facet_wrap(~read))
 ``` 
 
 
@@ -269,7 +286,7 @@ ac_df <- update_samples(ac_df)
 
 ac_list <- ac_df |> group_by(Adapter) |> summarize(max = max(Pct)) |> filter(max >= 0.05) |> select(Adapter)
 
-ggplotly(ggplot(ac_df |> filter(Adapter %in% ac_list), aes(x=Position, y=Pct, col=Sample)) + geom_line() + facet_wrap(~read+Adapter, labeller = label_wrap_gen(multi_line=FALSE)))
+ggplotly(ggplot(ac_df |> filter(Adapter %in% ac_list), aes(x=Position, y=Pct, col=Sample)) + geom_line() + facet_wrap(~read+Adapter))
 ```
 
 
