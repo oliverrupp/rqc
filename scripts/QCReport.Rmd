@@ -532,3 +532,46 @@ ggplotly(intra_sample_dist)
 ```
 
 
+Benchmarks
+=====================================
+
+Column {.tabset data-width=1000}
+-------------------------------------
+
+### Benchmark
+
+```{r benchmark}
+files <- list.files(
+  paste0(params$results, "/benchmark/"),
+  pattern = "\\.txt$",
+  full.names = TRUE
+)
+
+bench_df <- map_dfr(files, function(f) {
+  nm <- basename(f) |> str_remove("\\.txt$")
+
+  parts <- str_split(nm, "\\.", simplify = TRUE)
+
+  rule <- parts[1]
+  wildcard <- paste(parts[-1], collapse = ".")
+
+  read_tsv(f, show_col_types = FALSE) |>
+    mutate(
+      rule = rule,
+      wildcard = wildcard,
+      file = basename(f)
+    )
+})
+
+memory <- bench_df |> select(c(rule, value = max_rss, sample = wildcard, threads)) |> mutate(metric = "memory_mb")
+time <- bench_df |> select(c(rule, value = s, sample = wildcard, threads)) |> mutate(metric = "runtime_s")
+
+bdf <- rbind(memory, time)
+
+bdf$threads = factor(bdf$threads)
+
+ggplotly(ggplot(bdf, aes(x = rule, y = value, label=sample, col = threads)) +
+           geom_jitter(width=0.25) + facet_wrap(~metric, scale="free_y") +
+           theme(axis.text.x = element_text(angle = 90, hjust = 0)))
+
+```

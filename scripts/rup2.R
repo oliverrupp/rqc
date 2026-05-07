@@ -24,7 +24,7 @@ suppressMessages(library(filelock))
 suppressMessages(library(scales))
 suppressMessages(library(stringr))
 
-#### setwd("/home/orupp/Projects/trqc/CS")
+#### setwd("/home/orupp/Projects/trqc/PP")
 
 ##################### INIT ####################################################
 

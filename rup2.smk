@@ -94,6 +94,7 @@ rule index_full:
         nodes=1,
         cpus_per_task=24
     conda: "envs/salmon.yaml"
+    benchmark: "{plant}/benchmark/index_full.txt"
     shell: """
            salmon --no-version-check index -p {threads} \
            -i {wildcards.plant}/results/index/salmon \
@@ -110,6 +111,7 @@ rule star_map:
     output:
         "{plant}/results/bam/{sample}/STARAligned.out.bam"
     threads: 24
+    benchmark: "{plant}/benchmark/star_map.{sample}.txt"
     resources:
         mem_mb=96000,
         runtime=360,
@@ -148,6 +150,7 @@ rule sort_bam:
         runtime=360,
         nodes=1,
         cpus_per_task=8
+    benchmark: "{plant}/benchmark/sort_bam.{sample}.txt"
     conda: "envs/STAR.yaml"
     shell: """
             samtools sort -m 5G -@ {threads} -o {output} {input}
@@ -160,6 +163,7 @@ rule scallop:
     input: "{plant}/results/bam/{sample}/STARAligned.sorted.bam"
     output: "{plant}/results/scallop/{sample}/scallop.gtf"
     threads: 1
+    benchmark: "{plant}/benchmark/scallop.{sample}.txt"
     resources:
         mem_mb=32000,
         runtime=360,
@@ -177,6 +181,7 @@ rule star_index:
         gff="{plant}/reference/annotation.gtf"
     output: directory("{plant}/results/index/STAR")
     threads: 24
+    benchmark: "{plant}/benchmark/star_index.txt"
     resources:
         mem_mb=256000,
         runtime=360,
@@ -209,6 +214,7 @@ rule index_small:
         nodes=1,
         cpus_per_task=8
     conda: "envs/salmon.yaml"
+    benchmark: "{plant}/benchmark/index_{ref}.txt"
     shell: """
            salmon --no-version-check index -p {threads} \
                   -i {wildcards.plant}/results/index/salmon_{wildcards.ref} \
@@ -283,6 +289,7 @@ rule find_rrnas:
     output: "{plant}/reference/barrnap.out"
     conda: "envs/barrnap.yaml"
     threads: 8
+    benchmark: "{plant}/benchmark/barrnap.txt"
     shell: """barrnap --kingdom euk --threads {threads} {input} > {output}"""
 
 
@@ -307,6 +314,7 @@ rule trim_pe:
     threads:
         8
     conda: "envs/fastp.yaml"
+    benchmark: "{plant}/benchmark/trim_pe.{sample}.txt"
     shell: """
            fastp -i {input.r1} -I {input.r2} \
                  -o {output.r1pe} -O {output.r2pe} \
@@ -326,6 +334,7 @@ rule trim_se:
     threads:
         8
     conda: "envs/fastp.yaml"
+    benchmark: "{plant}/benchmark/trim_se.{sample}.txt"
     shell: """
            fastp -i {input.rs}  \
                  -o {output.rse}  \
@@ -341,6 +350,7 @@ rule falco_untrimmed:
         summary="{plant}/results/falco/untrimmed/{name}.summary"
     threads: 1
     conda: "envs/falco.yaml"
+    benchmark: "{plant}/benchmark/falco_untrimmed.{name}.txt"
     shell: """
            falco {input} -skip-report -q \
                  -D {output.data} -S {output.summary}
@@ -354,6 +364,7 @@ rule falco_trimmed:
         summary="{plant}/results/falco/trimmed/{name}.summary"
     threads: 1
     conda: "envs/falco.yaml"
+    benchmark: "{plant}/benchmark/falco_trimmed.{name}.txt"
     shell: """
            falco {input} -skip-report -q \
                  -D {output.data} -S {output.summary}
@@ -375,6 +386,7 @@ rule salmon_pe:
         nodes=1,
         cpus_per_task=16
     conda: "envs/salmon.yaml"
+    benchmark: "{plant}/benchmark/salmon_pe.{sample}.txt"
     shell: """
            salmon --no-version-check quant -l A --numGibbsSamples 30 \
 		  --gcBias --validateMappings --minAssignedFrags 0 \
@@ -401,6 +413,7 @@ rule salmon_se:
         nodes=1,
         cpus_per_task=16
     conda: "envs/salmon.yaml"
+    benchmark: "{plant}/benchmark/salmon_se.{sample}.txt"
     shell: """
            salmon --no-version-check quant -l A --numGibbsSamples 30 \
 		  --gcBias --validateMappings --minAssignedFrags 0 \
@@ -429,6 +442,7 @@ rule salmon_pe_rrna:
         nodes=1,
         cpus_per_task=16
     conda: "envs/salmon.yaml"
+    benchmark: "{plant}/benchmark/salmon_pe_rrna.{sample}.txt"
     shell: """
            salmon --no-version-check quant -l A --minAssignedFrags 0 \
 	   	  -i {wildcards.plant}/results/index/salmon_rrna \
@@ -454,6 +468,7 @@ rule salmon_se_rrna:
         nodes=1,
         cpus_per_task=16
     conda: "envs/salmon.yaml"
+    benchmark: "{plant}/benchmark/salmon_se_rrna.{sample}.txt"
     shell: """
            salmon --no-version-check quant -l A --minAssignedFrags 0 \
 	   	  -i {wildcards.plant}/results/index/salmon_rrna \
@@ -474,6 +489,7 @@ rule salmon_pe_quantiles:
     threads:
         16
     conda: "envs/salmon.yaml"
+    benchmark: "{plant}/benchmark/salmon_pe_quantiles.{sample}.txt"
     shell: """
            salmon --no-version-check quant -l A --minAssignedFrags 0 \
 	   	  -i {wildcards.plant}/results/index/salmon_quantiles \
@@ -493,6 +509,7 @@ rule salmon_se_quantiles:
     threads:
         16
     conda: "envs/salmon.yaml"
+    benchmark: "{plant}/benchmark/salmon_se_quantiles.{sample}.txt"
     shell: """
            salmon --no-version-check quant -l A --minAssignedFrags 0 \
 	   	  -i {wildcards.plant}/results/index/salmon_quantiles \
@@ -523,6 +540,7 @@ rule assembly:
         reference="{plant}/reference/annotation.gtf"
     output: "{plant}/results/scallop.gtf"
     threads: 12
+    benchmark: "{plant}/benchmark/stringtie_merge.txt"
     resources:
         mem_mb=15000,
         runtime=360,
@@ -548,6 +566,7 @@ rule report_html:
         report='{plant}/{plant}.report.html'
     conda: "envs/R.yaml"
     threads: 1
+    benchmark: "{plant}/benchmark/report_html.txt"
     params: reads=config.get("reads", 1000000)
     script: "scripts/rup2.R"
 
