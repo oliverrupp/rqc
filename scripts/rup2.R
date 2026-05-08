@@ -24,7 +24,7 @@ suppressMessages(library(filelock))
 suppressMessages(library(scales))
 suppressMessages(library(stringr))
 
-#### setwd("/home/orupp/Projects/trqc/PP")
+#### setwd("/home/orupp/Projects/trqc/CS")
 
 ##################### INIT ####################################################
 
@@ -320,6 +320,108 @@ sample_cor <- cor(cor_data, method = "pearson", use = "pairwise.complete.obs")
 sample_dist <- as.matrix(dist(t(cor_data)))
 
 unlock(mtx)
+
+###############################################################################
+
+
+##################### Saturation ##############################################
+
+counts <- counts(dds)
+fractions <- seq(0.05, 1, by=0.05)
+
+results <- list()
+
+for(sample in colnames(counts)) {
+  
+  x <- counts[,sample]
+  
+  for(frac in fractions) {
+    
+    # probabilistic downsampling
+    subsampled <- rbinom(
+      length(x),
+      size = round(x),
+      prob = frac
+    )
+    
+    detected <- sum(subsampled >= 5)
+    
+    results[[length(results)+1]] <- data.frame(
+      sample = sample,
+      fraction = frac,
+      detected = detected
+    )
+  }
+}
+
+df <- do.call(rbind, results)
+
+saveRDS(df, "results/rds/saturation.rds")
+
+###############################################################################
+
+
+
+
+
+##################### Gene Complexity #########################################
+counts <- as.data.frame(counts(dds))
+
+gene_fraction <- counts %>% mutate(across(everything(), ~ .x / sum(.x)))
+
+gene_fraction_cumsum <- as.data.frame(apply(gene_fraction, 2, function(x) cumsum(sort(x, decreasing = T))))
+
+gene_fraction_cumsum$gene = 1:nrow(gene_fraction_cumsum)
+
+gfdf <- gene_fraction_cumsum |> pivot_longer(!gene)
+
+gene_fraction_cumsum[c(10, 50, 100),] |> dplyr::select(-gene) * 100 -> top_x_genes
+
+top_x_genes <- t(top_x_genes)
+
+top_x_genes <- as.data.frame(top_x_genes) |> mutate(across(where(is.numeric), ~ sprintf("%.2f %%", .x)))
+
+shannon_df <- apply(counts, 2, function(x) {
+  
+  p <- x / sum(x)
+  p <- p[p > 0]
+  
+  -sum(p * log(p))
+})
+
+shannon_df <- data.frame(shannon=shannon_df, samples = names(shannon_df))
+saveRDS(list(gfdf=gfdf, topx=top_x_genes, shannon=shannon_df), "results/rds/complexity.rds")
+
+###############################################################################
+
+
+
+
+
+##################### DISPERSION ##############################################
+
+
+dds <- estimateSizeFactors(dds)
+dds <- estimateDispersions(dds)
+
+
+# Extract values
+df <- data.frame(
+  mean = mcols(dds)$baseMean,
+  geneEst = mcols(dds)$dispGeneEst,
+  fit = mcols(dds)$dispFit,
+  final = dispersions(dds)
+)
+
+# Remove invalid rows
+df <- df[
+  is.finite(df$mean) &
+    is.finite(df$geneEst) &
+    df$mean > 0 &
+    df$geneEst > 0,
+]
+
+saveRDS(df, file="results/rds/dispersion.rds")
 
 ###############################################################################
 

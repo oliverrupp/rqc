@@ -2,7 +2,7 @@ template <- "/home/orupp/Projects/rup2/scripts/QCReport.Rmd"
 folder <- "/home/orupp/Projects/trqc"
 plant <- "CS"
 
-plants <- list.dirs(folder, recursive = F, full.names = F)
+plants <- c("CS", "PP") #list.dirs(folder, recursive = F, full.names = F)
 
 for(plant in plants) {
   rmarkdown::render(

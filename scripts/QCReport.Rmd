@@ -12,7 +12,7 @@ params:
 
 ```{r setup, include=FALSE}
 library(flexdashboard)
-library(ggplot2)
+library(tidyverse)
 library(plotly)
 library(DT)
 library(scales)
@@ -55,8 +55,19 @@ Column {data-width=350}
 
 ### Read count analysis
 
-```{r}
-datatable(results)
+```{r table}
+libinfo_path <- paste0(params$results,"/results/salmon/")
+
+files <- list.files(path = libinfo_path, pattern = "lib_format_counts.json", recursive = T,  full.names = TRUE)
+
+d <- lapply(files, fromJSON)
+
+df <- do.call(rbind, lapply(d, as.data.frame)) |> select(!c(read_files)) |> 
+  select(where(~ !is.numeric(.x) || sum(.x, na.rm = TRUE) > 0))
+
+rownames(df) <- basename(dirname(files))
+
+datatable(df)
 ```
 
 
@@ -66,7 +77,7 @@ FastP Analyses
 Column {.tabset .tabset-pills}
 -------------------------------------
 
-```{r, include=FALSE}
+```{r fastp_data, include=FALSE}
 trimmed_path <- paste0(params$results, "/results/trimmed")
 
 files <- list.files(path = trimmed_path, pattern = "\\.json$", full.names = TRUE)
@@ -96,7 +107,7 @@ dup_df <- tibble(
 )
 
 dupp <- ggplot(dup_df, aes(x = sample, y = duplication_rate*100)) +
-  geom_col(fill = "red", col="black") +
+  geom_col(fill = "#2780e3", col="black") +
   labs(x = "Sample", y = "Rate %") + 
   theme(axis.text.x = element_text(angle = 90, hjust = 0))
 ggplotly(dupp)
@@ -291,6 +302,42 @@ ggplotly(ggplot(ac_df |> filter(Adapter %in% ac_list), aes(x=Position, y=Pct, co
 
 
 
+Dispersion
+=====================================
+
+Column {data-width=750}
+-------------------------------------
+
+### Dispersion
+
+```{r dispersion}
+df <- readRDS(paste0(params$results, "/results/rds/dispersion.rds"))
+disp <- ggplot(df, aes(mean, geneEst)) +
+  
+  geom_point(
+    color = "black",
+    alpha = 0.25,
+    size = 0.5
+  ) +
+  
+  geom_point(
+    aes(y = final),
+    color = "dodgerblue",
+    alpha = 0.25,
+    size = 0.5
+  ) +
+  
+  geom_line(
+    aes(y = fit),
+    color = "red",
+    linewidth = 1
+  ) +
+  
+  scale_x_log10() +
+  scale_y_log10()
+
+disp
+```
 
 
 
@@ -301,19 +348,59 @@ Read Assignment Analysis
 Column {data-width=350}
 -------------------------------------
 
-```{r}
+### Percentage of reads per top X genes
+
+```{r load_gene_coverage}
+complexity <- readRDS(paste0(params$results, "/results/rds/complexity.rds"))
+
 dfmdet <- readRDS(paste0(params$results, "/results/rds/gene_coverage_plot.rds"))
 
 dfm <- dfmdet$dfm
 detected <- dfmdet$detected
 detected2 <- dfmdet$detected2
 
-knitr::kable(head(dfm))
+datatable(complexity$topx)
 ```
+
+
 
 
 Column {.tabset data-width=650}
 -------------------------------------
+
+### Gene Complexity
+
+```{r complexity}
+gfdf <- complexity$gfdf
+ggplotly(ggplot(gfdf, aes(x = gene, y = value, col = name)) + geom_line() + xlab("Number of Genes") + ylab("Pct. of Reads"))
+
+```
+
+### Saturation
+
+```{r saturation}
+df <- readRDS(paste0(params$results, "/results/rds/saturation.rds"))
+
+ggplotly(ggplot(df, aes(fraction, detected, color=sample)) +
+  geom_line() +
+  geom_point(size=0.7) +
+  theme_bw() +
+  labs(
+    x = "Fraction of reads retained",
+    y = "Detected genes",
+    title = "Gene detection saturation"
+  ))
+```
+
+
+### Shannon Entropy
+
+```{r shannon}
+shannon_df <- complexity$shannon
+ggplotly(ggplot(shannon_df, aes(x = samples, y=shannon)) + geom_bar(stat = "identity", fill="#2780e3", col="black") + theme(axis.text.x = element_text(angle = 90, hjust = 0)))
+
+```
+
 
 ### Read Assignment Comparison
 
