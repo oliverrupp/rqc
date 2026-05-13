@@ -20,6 +20,32 @@ library(GGally)
 library(jsonlite)
 ``` 
 
+Summary
+=====================================
+
+Column {data-width=650}
+-------------------------------------
+
+### Summary
+
+```{r summary}
+samples <- read.table(paste0(params$results, "/reference/samples.tsv"), header=T, sep="\t", row.names = 2)
+summary <- readRDS(paste0(params$results, "/results/rds/summary.rds"))
+
+summary <- cbind(samples[summary$sample,], summary) |> dplyr::select(-sample)
+
+datatable(summary) |>
+  formatStyle(
+    colnames(summary)[-1],
+    backgroundColor = styleEqual(
+      c("FAIL", "ATTENTION", "PASS"),
+      c("salmon", "lightyellow", "lightgreen")
+    )
+  )
+
+```
+
+
 Read Count Analysis
 =====================================
 
@@ -62,8 +88,8 @@ files <- list.files(path = libinfo_path, pattern = "lib_format_counts.json", rec
 
 d <- lapply(files, fromJSON)
 
-df <- do.call(rbind, lapply(d, as.data.frame)) |> select(!c(read_files)) |> 
-  select(where(~ !is.numeric(.x) || sum(.x, na.rm = TRUE) > 0))
+df <- do.call(rbind, lapply(d, as.data.frame)) |> dplyr::select(!c(read_files)) |> 
+  dplyr::select(where(~ !is.numeric(.x) || sum(.x, na.rm = TRUE) > 0))
 
 rownames(df) <- basename(dirname(files))
 
@@ -295,7 +321,7 @@ ac_df <- map_dfr(names(all_data), function(s) {
 
 ac_df <- update_samples(ac_df)
 
-ac_list <- ac_df |> group_by(Adapter) |> summarize(max = max(Pct)) |> filter(max >= 0.05) |> select(Adapter)
+ac_list <- ac_df |> group_by(Adapter) |> summarize(max = max(Pct)) |> filter(max >= 0.05) |> dplyr::select(Adapter)
 
 ggplotly(ggplot(ac_df |> filter(Adapter %in% ac_list), aes(x=Position, y=Pct, col=Sample)) + geom_line() + facet_wrap(~read+Adapter))
 ```
@@ -540,17 +566,17 @@ Column {.tabset data-width=1000}
 pca_res = readRDS(paste0(params$results, "/results/rds/pca_res.rds"))
 
 # scores (samples)
-scores <- as.data.frame(pca_res$rotated)
+scores <- as.data.frame(pca_res$x)
 scores$sample <- rownames(scores)
 
 # add metadata
-scores <- cbind(scores, pca_res$metadata)
+scores <- cbind(scores, condition=samples$condition, pca_outlier=summary$PCA_OUTLIER)
 
-pca_plot <- ggplot(scores, aes(x = PC1, y = PC2, color = condition)) +
+pca_plot <- ggplot(scores, aes(x = PC1, y = PC2, color = condition, label = sample, shape = pca_outlier)) +
   geom_point(size = 3) +
   labs(
-    x = paste0("PC1 (", round(pca_res$variance["PC1"], 1), "%)"),
-    y = paste0("PC2 (", round(pca_res$variance["PC2"], 1), "%)")
+    x = paste0("PC1 (", round(pca_res$x["PC1"], 1), "%)"),
+    y = paste0("PC2 (", round(pca_res$x["PC2"], 1), "%)")
   ) +
   theme_bw()
 
@@ -560,14 +586,14 @@ ggplotly(pca_plot)
 ### PCA Pairs plot
 
 ```{r PCA_pairs}
-minpc <- min(ncol(pca_res$rotated), 5)
-scores <- as.data.frame(pca_res$rotated[, 1:minpc])
-scores <- cbind(scores, pca_res$metadata)
+minpc <- min(ncol(pca_res$x), 5)
+scores <- as.data.frame(pca_res$x[, 1:minpc])
+scores <- cbind(scores, condition=samples$condition, sample=rownames(samples))
 
 p = ggpairs(
   scores,
   columns = 1:minpc,
-  aes(color = condition),
+  aes(color = condition, label = sample),
   upper = list(continuous = "points"),
   lower = list(continuous = "points"),
   diag = list(continuous = "densityDiag")
@@ -578,45 +604,45 @@ ggplotly(p)
 
 
 
-PCA outlier
-=====================================
+<!-- PCA outlier -->
+<!-- ===================================== -->
 
-Column {.tabset data-width=1000}
--------------------------------------
+<!-- Column {.tabset data-width=1000} -->
+<!-- ------------------------------------- -->
 
-### PCA Outlier
+<!-- ### PCA Outlier -->
 
-```{r pca_outlier}
-  pca_obj <- readRDS(paste0(params$results, "/results/rds/pca_outlier_2.rds"))
+<!-- ```{r pca_outlier} -->
+<!--   pca_obj <- readRDS(paste0(params$results, "/results/rds/pca_outlier_2.rds")) -->
 
-  pca_data <- pca_obj$pca_data
-  outlier_data <- pca_obj$outlier_data
+<!--   pca_data <- pca_obj$pca_data -->
+<!--   outlier_data <- pca_obj$outlier_data -->
 
-  pca_outlier <- ggplot(pca_data, aes(x = condition, y = rot)) +
-        geom_point(size=0.5)  +
-        geom_label(data=outlier_data, aes(label=samples), hjust = 0) +
-        geom_point(data=outlier_data, col="red", size=0.5) +
-        facet_wrap(~PC)
-  
-  ggplotly(pca_outlier)
-```
+<!--   pca_outlier <- ggplot(pca_data, aes(x = condition, y = rot)) + -->
+<!--         geom_point(size=0.5)  + -->
+<!--         geom_label(data=outlier_data, aes(label=samples), hjust = 0) + -->
+<!--         geom_point(data=outlier_data, col="red", size=0.5) + -->
+<!--         facet_wrap(~PC) -->
+
+<!--   ggplotly(pca_outlier) -->
+<!-- ``` -->
 
 
-### PCA Sample Distance
+<!-- ### PCA Sample Distance -->
 
-```{r pca_intra_sample_dist}
-pca_obj <- readRDS(paste0(params$results, "/results/rds/pca_outlier.rds"))
+<!-- ```{r pca_intra_sample_dist} -->
+<!-- pca_obj <- readRDS(paste0(params$results, "/results/rds/pca_outlier.rds")) -->
 
-dns_values <- pca_obj$dns_values
-peaks <- pca_obj$peaks
+<!-- dns_values <- pca_obj$dns_values -->
+<!-- peaks <- pca_obj$peaks -->
 
-intra_sample_dist <- ggplot(dns_values, aes(x=x, y=y)) +
-    geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") +
-    geom_line() +
-    xlab("intra sample PCA distance") +
-    facet_wrap(~pc)
-ggplotly(intra_sample_dist)
-```
+<!-- intra_sample_dist <- ggplot(dns_values, aes(x=x, y=y)) + -->
+<!--     geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") + -->
+<!--     geom_line() + -->
+<!--     xlab("intra sample PCA distance") + -->
+<!--     facet_wrap(~pc) -->
+<!-- ggplotly(intra_sample_dist) -->
+<!-- ``` -->
 
 
 Benchmarks
@@ -650,8 +676,8 @@ bench_df <- map_dfr(files, function(f) {
     )
 })
 
-memory <- bench_df |> select(c(rule, value = max_rss, sample = wildcard, threads)) |> mutate(metric = "memory_mb")
-time <- bench_df |> select(c(rule, value = s, sample = wildcard, threads)) |> mutate(metric = "runtime_s")
+memory <- bench_df |> dplyr::select(c(rule, value = max_rss, sample = wildcard, threads)) |> mutate(metric = "memory_mb")
+time <- bench_df |> dplyr::select(c(rule, value = s, sample = wildcard, threads)) |> mutate(metric = "runtime_s")
 
 bdf <- rbind(memory, time)
 

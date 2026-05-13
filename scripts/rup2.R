@@ -27,7 +27,7 @@ suppressMessages(library(stringr))
 #### setwd("/home/orupp/Projects/trqc/CS")
 
 ##################### INIT ####################################################
-
+message(" ----- INIT")
 ### DEBUG: rm(list=ls())
 ### DEBUG: setwd("/vol/ranomics/rnaseq/QC/TT")
 
@@ -54,7 +54,9 @@ if (exists("snakemake")) {
   outfile <- basename(snakemake@output[["report"]])
 }
 
-dir.create("results/rds", recursive = TRUE)
+if( !dir.exists("results/rds") ) {
+  dir.create("results/rds", recursive = TRUE)
+}
 
 # pdf(outfile, w = 24, h = 16)
 
@@ -67,6 +69,7 @@ theme_set(theme_bw())
 
 
 ##################### SAMPLES #################################################
+message(" ----- SAMPLES")
 
 sample_info <- read.table("reference/samples.tsv",
                           header = TRUE, sep = "\t", row.names = 2)
@@ -81,12 +84,15 @@ sample_info$names <- rownames(sample_info)
 
 samples <- row.names(sample_info)
 
-message(sample_info)
+
+
+# message(sample_info)
 
 ###############################################################################
 
 
 ##################### FALCO QC REPORT #########################################
+message(" ----- FALCO")
 
 # ── PARSERS ───────────────────────────────────────────────────────────────────
 read_falco <- function(path) {
@@ -138,24 +144,33 @@ saveRDS(all_data, file="results/rds/falco_qc.rds")
 
 
 ##################### READ COUNTS #############################################
+message(" ----- READ COUNTS")
 
 results <- data.frame(sample = character(),
                       status = character(),
                       reference = character(),
                       reads = integer())
 
+tr <- c()
+duprate <- c()
+
 for (sample in samples) {
-  message(sample)
+  # message(sample)
   jfile <- paste0("results/trimmed/", sample, ".json")
   jdat <- fromJSON(file = jfile)
 
+  duprate <- c(duprate, jdat$duplication$rate)
+  
   type <- jdat$summary$sequencing
   div <- 1
 
   if (regexpr("paired end", type) >= 0) {
     div <- 2
   }
-  total_reads <- jdat$summary$before_filtering$total_reads
+  total_reads <- jdat$summary$before_filtering$total_reads / div
+  
+  tr <- c(tr, total_reads)
+  
   stats <- data.frame(status = c("LowQuality", "Nreads", "TooShort", "TooLong"),
                       reads = c(jdat$filtering_result$low_quality_reads / div,
                                 jdat$filtering_result$too_many_N_reads / div,
@@ -197,42 +212,58 @@ results$status <- factor(results$status,
                                         "NoFeature", "Unmapped",
                                         "Nreads", "TooShort",
                                         "TooLong", "LowQuality")))
-
-# reads_plot <- ggplot(results, aes(x = sample, y = reads, fill = status)) +
-#   geom_hline(yintercept=c(min_assigned_read_count, 50e6)) +
-#   geom_bar(stat = "identity") +
-#   scale_y_continuous(
-#     	breaks = function(x) {
-#       		default_breaks <- extended_breaks()(x)
-#       		sort(c(default_breaks, min_assigned_read_count))
-#     	},
-#     	labels = function(breaks) {
-#      		ifelse(breaks == min_assigned_read_count, "minimal read count", breaks)
-#     	}
-#   ) + 
-#   theme(text = element_text(size = 18)) + ggtitle("Read count analysis") +
-#   theme(axis.text.x = element_text(angle = 90, hjust = 0))
-
 saveRDS(results, "results/rds/reads_plot.rds")
-
-# print(reads_plot)
 
 ###############################################################################
 
-#message(sample_info)
-sink(file.path(getwd(), "filtered_samples.txt"))
-print(paste0("Low Read Count [<, ", min_assigned_read_count, "]:"))
-print(results[results$status == "Assigned" & results$reads < min_assigned_read_count,]$sample)  
-sink()
 
-samples <- results[results$status == "Assigned" & results$reads >= min_assigned_read_count,]$sample
+######################## ADD SUMMARY ##########################################
+message(" ----- SUMMARY 1")
 
-sample_info <- sample_info[samples,]
+PASS_FAIL <- data.frame(sample = samples)
+
+results |> filter(status == "Assigned") |>  
+  mutate(ASSIGNED_READS = case_when(reads > 50e6 ~ "PASS", reads < 20e6 ~ "FAIL", .default  = "ATTENTION")) |>
+  dplyr::select(c(sample, ASSIGNED_READS)) |> inner_join(PASS_FAIL, by="sample") -> PASS_FAIL
+
+results |> filter(status == "Unmapped") |> arrange(match(sample, samples)) |> mutate(tr = tr) |> mutate(pct_assigned = (tr-reads)/tr*100) |>
+  mutate(PCT_MAPPED = case_when(pct_assigned > 85 ~ "PASS", pct_assigned < 70 ~ "FAIL", .default  = "ATTENTION")) |>
+  dplyr::select(c(sample, PCT_MAPPED)) |> inner_join(PASS_FAIL, by="sample") -> PASS_FAIL
+
+
+results |> filter(status == "rRNA") |> arrange(match(sample, samples)) |> mutate(tr = tr) |> mutate(pct_rrna = -1*reads/tr*100) |>  
+  mutate(PCT_RRNA = case_when(pct_rrna < 5 ~ "PASS", pct_rrna > 20 ~ "FAIL", .default  = "ATTENTION")) |>
+  dplyr::select(c(sample, PCT_RRNA)) |> inner_join(PASS_FAIL, by="sample") -> PASS_FAIL
+
+
+names(duprate) <- samples
+
+as.data.frame(duprate) |> 
+  mutate(DUPRATE = case_when(duprate < 0.4 ~ "PASS", duprate > 0.7 ~ "FAIL", .default  = "ATTENTION")) |>
+  rownames_to_column("sample") |> dplyr::select(c(sample, DUPRATE)) |> 
+  inner_join(PASS_FAIL, by="sample") -> PASS_FAIL
+  
+
+
+
+###############################################################################
+
+
+# #message(sample_info)
+# sink(file.path(getwd(), "filtered_samples.txt"))
+# print(paste0("Low Read Count [<, ", min_assigned_read_count, "]:"))
+# print(results[results$status == "Assigned" & results$reads < min_assigned_read_count,]$sample)
+# sink()
+# 
+# samples <- results[results$status == "Assigned" & results$reads >= min_assigned_read_count,]$sample
+# 
+# sample_info <- sample_info[samples,]
 
 
 
 ##################### COLLECT COUNTS ##########################################
-
+message(" ----- READ SALMON")
+suppressMessages({
 mtx <- lock("~/.tximeta.lock")
 
 bcf_dir <- file.path(getwd(), "results/index/BFC")
@@ -301,9 +332,11 @@ gene_geTMM_counts <- cpm(gene_norm_edger)
 
 
 sample_info %>% group_by(condition) %>% summarize(rep_num = n()) -> rep_num
-message(rep_num)
 
 #### DESeq2 ####
+colData(gse)$condition <- factor(colData(gse)$condition)
+colData(se)$condition <- factor(colData(se)$condition)
+
 dds <- DESeqDataSet(gse, design = ~condition)
 tr_dds <- DESeqDataSet(se, design = ~condition)
 vsd <- vst(dds, blind = sum(rep_num$rep_num > 1) == 0) # blind = TRUE if no replicates!
@@ -320,11 +353,13 @@ sample_cor <- cor(cor_data, method = "pearson", use = "pairwise.complete.obs")
 sample_dist <- as.matrix(dist(t(cor_data)))
 
 unlock(mtx)
+})
 
 ###############################################################################
 
 
 ##################### Saturation ##############################################
+message(" ----- SATURATION")
 
 counts <- counts(dds)
 fractions <- seq(0.05, 1, by=0.05)
@@ -365,6 +400,8 @@ saveRDS(df, "results/rds/saturation.rds")
 
 
 ##################### Gene Complexity #########################################
+message(" ----- COMPLEXITY")
+
 counts <- as.data.frame(counts(dds))
 
 gene_fraction <- counts %>% mutate(across(everything(), ~ .x / sum(.x)))
@@ -376,6 +413,11 @@ gene_fraction_cumsum$gene = 1:nrow(gene_fraction_cumsum)
 gfdf <- gene_fraction_cumsum |> pivot_longer(!gene)
 
 gene_fraction_cumsum[c(10, 50, 100),] |> dplyr::select(-gene) * 100 -> top_x_genes
+
+as.data.frame(t(top_x_genes)) |> 
+  mutate(TOP100 = case_when(`100` < 50 ~ "PASS", `100`> 70 ~ "FAIL", .default  = "ATTENTION")) |>
+  rownames_to_column("sample") |> dplyr::select(c(sample, TOP100)) |> 
+  inner_join(PASS_FAIL, by="sample") -> PASS_FAIL
 
 top_x_genes <- t(top_x_genes)
 
@@ -399,11 +441,12 @@ saveRDS(list(gfdf=gfdf, topx=top_x_genes, shannon=shannon_df), "results/rds/comp
 
 
 ##################### DISPERSION ##############################################
+message(" ----- DISPERSION")
 
-
-dds <- estimateSizeFactors(dds)
-dds <- estimateDispersions(dds)
-
+suppressMessages({
+  dds <- estimateSizeFactors(dds)
+  dds <- estimateDispersions(dds)
+})
 
 # Extract values
 df <- data.frame(
@@ -428,6 +471,7 @@ saveRDS(df, file="results/rds/dispersion.rds")
 
 
 ##################### READS/GENE COUNT COMPARISON #############################
+message(" ----- READ COUNT COMP")
 
 cols <- colnames(gene_count_matrix)
 n  <- length(cols)
@@ -453,6 +497,7 @@ saveRDS(mat, file="results/rds/read_count_comp.rds")
 
 
 ##################### READS/GENE COUNTS #######################################
+message(" ----- GENE COUNTS")
 
 df <- data.frame("G0" = colSums(gene_count_matrix == 0),
                  "G1" = colSums(gene_count_matrix > 0 &
@@ -466,7 +511,7 @@ df$Sample <- sample_info[df$Replicate, ]$condition
 
 dfm <- melt(df, id.vars = c("Replicate", "Sample"))
 for (sample_name in unique(sample_info$condition)) {
-  message(sample_name)
+  # message(sample_name)
   if (sum(sample_info$condition == sample_name) > 1) {
     scols <- sample_info[sample_info$condition == sample_name, ]$names
     max_counts <- apply(gene_count_matrix[, scols], 1, max, na.rm = TRUE)
@@ -519,21 +564,6 @@ sorted_names <- c(mixedsort(unique(dfm$Replicate)),
                   mixedsort(unique(dfm$Sample)))
 dfm$Replicate <- factor(dfm$Replicate, levels = sorted_names)
 
-# gcp_colors <- c("#e0e0e0", "#faa39d", "#dbc160", "#00BA38")
-# names(gcp_colors) <- levels(dfm$variable)
-# 
-# gene_coverage_plot <- ggplot(dfm, aes(x = Replicate,
-#                                       y = value,
-#                                       fill = variable)) +
-#   geom_bar(stat = "identity") +
-#   ylab("Number of Genes") + xlab("Samples") +
-#   ggtitle("Number of Reads per Gene") +
-#   guides(fill = guide_legend(title = "Number of assigned reads")) +
-#   theme(text = element_text(size = 18)) +
-#   theme(axis.text.x = element_text(angle = 90, hjust = 0)) +
-#   facet_wrap(~Sample, scale = "free_x") +
-#   scale_fill_manual(values = gcp_colors)
-
 
 saveRDS(list(dfm=dfm, detected=detected, detected2=detected2), file="results/rds/gene_coverage_plot.rds")
 
@@ -546,13 +576,14 @@ saveRDS(list(dfm=dfm, detected=detected, detected2=detected2), file="results/rds
 
 
 ##################### GENE BODY COVERAGE ######################################
+message(" ----- GENE BODY COVERAGE")
 
 deg_res <- data.frame(sample = character(),
                       quantile = character(),
                       pct = integer())
 
 for (sample in samples) {
-  message(sample)
+  # message(sample)
 
   jfile <- paste0("results/salmon_quantiles/", sample, "/quant.sf")
 
@@ -595,6 +626,13 @@ skewness <- apply(deg_matrix, 1, function(data) {
   (px - pi) * abs(mx-mi) / 10
 })
 
+as.data.frame(skewness) |> 
+  mutate(BIAS53 = case_when(abs(skewness) > 3 ~ "FAIL", abs(skewness) > 1 ~ "ATTENTION", .default  = "PASS")) |>
+  rownames_to_column("sample") |> dplyr::select(c(sample, BIAS53)) |> 
+  inner_join(PASS_FAIL, by="sample") -> PASS_FAIL
+
+
+
 skewclass <- rep("normal", length(skewness))
 names(skewclass) <- names(skewness)
 
@@ -623,7 +661,7 @@ s <- s[samples,]
 
 if (length(colnames(s)) > 1) {
 	faktors <- colnames(s)
-	message(faktors)
+	# message(faktors)
 	faktors <- faktors[!faktors %in% c("condition")]
 
 	for(f in faktors) {
@@ -644,13 +682,6 @@ deg_matrix <- deg_matrix[rev(order(skewness)),]
 
 saveRDS(list(matrix = deg_matrix, colors = ccols, skewclass = skewclass, cclass = cclass), "results/rds/genebody_coverage.rds")
 
-# ComplexHeatmap::pheatmap(as.matrix(deg_matrix), cluster_rows = FALSE, cluster_cols = FALSE,
-#                          annotation_row = cclass, annotation_colors = ccols,
-#                          treeheight_row = 0, fontsize = 12, border = FALSE,
-#                          row_split = skewclass,
-#                          heatmap_legend_param = list(title = "coverage (%)"),
-#                          main = "RNA degradation (gene body coverage)")
-
 ###############################################################################
 
 
@@ -658,6 +689,8 @@ saveRDS(list(matrix = deg_matrix, colors = ccols, skewclass = skewclass, cclass 
 
 
 ##################### CHECK FACTORS ###########################################
+message(" ----- FACTORS")
+
 # https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html
 
 geoMeanNZ <- function(x) {
@@ -679,15 +712,6 @@ df <- lapply(1:ncol(cor_data), function(smple) {
 df$replicate = df$sample
 df$sample = sample_info[df$replicate,]$condition
 
-# factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
-#     geom_vline(xintercept=0) + geom_density() + theme_bw()
-# 
-# print(factor_plot)
-# 
-# split_factor_plot <- ggplot(df, aes(ratios, col = sample, group = replicate)) + 
-#     geom_vline(xintercept=0) + geom_density() + theme_bw() + facet_wrap(~sample)
-# 
-# print(split_factor_plot)
 
 saveRDS(df, file="results/rds/split_factor_plot.rds")
 
@@ -699,6 +723,7 @@ saveRDS(df, file="results/rds/split_factor_plot.rds")
 
 
 ##################### SAMPLE CORRELATION ######################################
+message(" ----- SAMPLE CORRELATION")
 
 a <- data.frame(samples = sample_info[colnames(cor_data), 1])
 row.names(a) <- colnames(cor_data)
@@ -716,7 +741,7 @@ if (length(colnames(s)) > 1) {
     ccols = list(condition = condcols)
 
     faktors <- colnames(s)
-    message(faktors)
+    # message(faktors)
     faktors <- faktors[!faktors %in% c("condition")]
 
     for(f in faktors) {
@@ -734,131 +759,155 @@ if (length(colnames(s)) > 1) {
 }
 
 
-# pheatmap::pheatmap(sample_cor,
-#                    fontsize = 12,
-#                    annotation_col = a,
-#                    annotation_colors = ccols,
-#                    main = "Sample Correlation Heatmap of VST counts")
-
 saveRDS(list(sample_cor = sample_cor, a = a, ccols = ccols), "results/rds/correlation_hm.rds")
 
 #######################################
 
 
-### PCA ####
+############### PCA ###################
+message(" ----- PCA")
 
-pca_res <- pca(cor_data, metadata = colData(se))
-saveRDS(pca_res, "results/rds/pca_res.rds")
+pca <- prcomp(t(cor_data), scale. = FALSE)
+saveRDS(pca, "results/rds/pca_res.rds")
 
-# biplot(pca_res, x = "PC2", y = "PC1",
-#        colby = "condition", title = "PCA of VST counts")
+n_pcs   <- min(ncol(pca$x), 5)
+scores  <- as.data.frame(pca$x[, 1:n_pcs])
+scores$condition <- colData(vsd)$condition
+
+outliers <- lapply(unique(scores$condition), function(g) {
+  
+  mat    <- as.matrix(scores[scores$condition == g, 1:n_pcs])
+  n_pcs_use <- min(ncol(mat), nrow(mat) - 1, 5)  # conservative for small n
+  mat    <- mat[, 1:n_pcs_use, drop = FALSE]
+  
+#  mcd    <- covMcd(mat)
+#  d2     <- mahalanobis(mat, center = mcd$center, cov = mcd$cov)
+  
+  centroid <- colMeans(mat)
+  d2        <- apply(mat, 1, \(x) sqrt(sum((x - centroid)^2))) # Euclidean, not squared
+
+  cutoff   <- median(d2) + 3 * mad(d2)
+
+  data.frame(
+    sample    = rownames(mat),
+    condition = g,
+    d2        = d2,
+    outlier   = d2 > cutoff
+  )
+}) |> do.call(rbind, args = _)
+
+outliers |> 
+  mutate(PCA_OUTLIER = case_when(outlier ~ "FAIL", .default  = "PASS")) |> 
+  dplyr::select(c(sample, PCA_OUTLIER)) |> 
+  inner_join(PASS_FAIL, by="sample") -> PASS_FAIL
+
 
 ##################
 
 
 
-##### PCA OUTLIER #####
-
-group_by_distance <- function(v, max_dist) {
-    if(length(v) >= 2) {
-        d <- dist(v)
-        hc <- hclust(d, method = "single")
-        cutree(hc, h = max_dist)
-    } else {
-        c(1)
-    }
-}
-
-
-pc95 <- min(length(pca_res$variance), 6) #sum(cumsum(pca_res$variance) < 75)
-outliers <- data.frame(sample = character(), pc = integer())
-dns_values <- data.frame(x = double(), y = double(), pc = character())
-peaks <- data.frame(peak = double(), pc = character)
-
-for(pc in 1:pc95) {
-    dst <- c()
-    for(condition in unique(colData(se)$condition)) {
-        if(sum(colData(se)$condition == condition) > 0) {
-            points <- pca_res$rotated[colnames(se)[colData(se)$condition == condition],][pc]
-            dst <- c(dst, as.vector(dist(points[,1])))
-        }
-    }
-
-    peak <- 1000
-
-    if(length(dst) > 1) {
-        dns <- density(dst)
-        peak <- dns$x[which.max(dns$y)]
-
-        pcid = sprintf("PC%d [%.2f]", pc, peak)
-        dns_values <- rbind(dns_values, data.frame(x = dns$x, y = dns$y, pc = pcid))
-        peaks <- rbind(peaks, data.frame(peak = peak, pc = pcid))
-    }
-    
-    message(peak)
-    
-    for(condition in unique(colData(se)$condition)) {
-        if(sum(colData(se)$condition == condition) > 0) {
-            points <- pca_res$rotated[colnames(se)[colData(se)$condition == condition],][pc]
-        
-            clstr <- group_by_distance(points[,1], 3*peak)
-
-            names(clstr) <- rownames(points)
-        
-            outlier <- names(clstr)[clstr != names(which.max(table(clstr)))]
-
-            if(length(outlier) > 0) {
-                outliers <- rbind(outliers, data.frame(sample = outlier, pc = pc))
-            }
-        }
-    }
-}
-
-if(nrow(outliers) > 0) {
-    outliers$val <- "+"
-    outlier_df <- as.data.frame(pivot_wider(outliers, id_cols = sample, names_from = pc, values_from = val, values_fill = "-"))
-
-    outlier_df <- cbind(outlier_df, s[outlier_df$sample,])
-    
-    write.table(outlier_df, "results/rds/PCA_outlier_PC1-5.tsv", sep="\t", quote=F, row.names = F)
-
-    # g <- ggplot(dns_values, aes(x=x, y=y)) +
-    #     geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") +
-    #     geom_line() +
-    #     xlab("inner sample PCA distance") + 
-    #     facet_wrap(~pc)
-    # print(g)
-    saveRDS(list(dns_values = dns_values, peaks = peaks), file="results/rds/pca_outlier.rds")
-    
-    outlier_ids <- unique(outliers$sample)
-    all_samples <- rownames(s[s$condition %in% unique(s[outlier_ids,,drop=F]$condition),,drop=F])
-    
-    pca_data = as.data.frame(pca_res$rotated[all_samples,1:pc95])
-
-    rownames_to_column(pca_data, "samples") %>%
-        pivot_longer(cols=-samples, names_to = "PC", values_to = "rot") -> pca_data
-
-    pca_data$condition <- s[pca_data$samples,,drop=FALSE]$condition
-
-    outliers$pc = paste0("PC", outliers$pc)
-    colnames(outliers) = c("samples", "PC")
-
-    pca_data %>% semi_join(outliers, by = c("samples", "PC")) -> outlier_data
-
-    variance <- sprintf("%.2f%%", pca_res$variance)[1:pc95]
-    names(variance) = paste0("PC", 1:pc95)
-
-    pca_data$PC = paste(pca_data$PC, " [", variance[pca_data$PC], "]", sep="")
-    outlier_data$PC = paste(outlier_data$PC, " [", variance[outlier_data$PC], "]", sep="")
-    
-    # g <- ggplot(pca_data, aes(x = condition, y = rot)) +
-    #     geom_point() + ggtitle("PCA outlier") + 
-    #     geom_label(data=outlier_data, aes(label=samples), hjust = 0) +
-    #     geom_point(data=outlier_data, col="red", size=2) +
-    #     facet_wrap(~PC)
-    # print(g)
-    saveRDS(list(pca_data=pca_data, outlier_data=outlier_data), file="results/rds/pca_outlier_2.rds")
-}
+# ##### PCA OUTLIER #####
+# 
+# group_by_distance <- function(v, max_dist) {
+#     if(length(v) >= 2) {
+#         d <- dist(v)
+#         hc <- hclust(d, method = "single")
+#         cutree(hc, h = max_dist)
+#     } else {
+#         c(1)
+#     }
+# }
+# 
+# 
+# pc95 <- min(length(pca_res$variance), 6) #sum(cumsum(pca_res$variance) < 75)
+# outliers <- data.frame(sample = character(), pc = integer())
+# dns_values <- data.frame(x = double(), y = double(), pc = character())
+# peaks <- data.frame(peak = double(), pc = character)
+# 
+# for(pc in 1:pc95) {
+#     dst <- c()
+#     for(condition in unique(colData(se)$condition)) {
+#         if(sum(colData(se)$condition == condition) > 0) {
+#             points <- pca_res$rotated[colnames(se)[colData(se)$condition == condition],][pc]
+#             dst <- c(dst, as.vector(dist(points[,1])))
+#         }
+#     }
+# 
+#     peak <- 1000
+# 
+#     if(length(dst) > 1) {
+#         dns <- density(dst)
+#         peak <- dns$x[which.max(dns$y)]
+# 
+#         pcid = sprintf("PC%d [%.2f]", pc, peak)
+#         dns_values <- rbind(dns_values, data.frame(x = dns$x, y = dns$y, pc = pcid))
+#         peaks <- rbind(peaks, data.frame(peak = peak, pc = pcid))
+#     }
+#     
+#     message(peak)
+#     
+#     for(condition in unique(colData(se)$condition)) {
+#         if(sum(colData(se)$condition == condition) > 0) {
+#             points <- pca_res$rotated[colnames(se)[colData(se)$condition == condition],][pc]
+#         
+#             clstr <- group_by_distance(points[,1], 3*peak)
+# 
+#             names(clstr) <- rownames(points)
+#         
+#             outlier <- names(clstr)[clstr != names(which.max(table(clstr)))]
+# 
+#             if(length(outlier) > 0) {
+#                 outliers <- rbind(outliers, data.frame(sample = outlier, pc = pc))
+#             }
+#         }
+#     }
+# }
+# 
+# if(nrow(outliers) > 0) {
+#     outliers$val <- "+"
+#     outlier_df <- as.data.frame(pivot_wider(outliers, id_cols = sample, names_from = pc, values_from = val, values_fill = "-"))
+# 
+#     outlier_df <- cbind(outlier_df, s[outlier_df$sample,])
+#     
+#     write.table(outlier_df, "results/rds/PCA_outlier_PC1-5.tsv", sep="\t", quote=F, row.names = F)
+# 
+#     # g <- ggplot(dns_values, aes(x=x, y=y)) +
+#     #     geom_vline(data = peaks, mapping = aes(xintercept = peak), col = "gray") +
+#     #     geom_line() +
+#     #     xlab("inner sample PCA distance") + 
+#     #     facet_wrap(~pc)
+#     # print(g)
+#     saveRDS(list(dns_values = dns_values, peaks = peaks), file="results/rds/pca_outlier.rds")
+#     
+#     outlier_ids <- unique(outliers$sample)
+#     all_samples <- rownames(s[s$condition %in% unique(s[outlier_ids,,drop=F]$condition),,drop=F])
+#     
+#     pca_data = as.data.frame(pca_res$rotated[all_samples,1:pc95])
+# 
+#     rownames_to_column(pca_data, "samples") %>%
+#         pivot_longer(cols=-samples, names_to = "PC", values_to = "rot") -> pca_data
+# 
+#     pca_data$condition <- s[pca_data$samples,,drop=FALSE]$condition
+# 
+#     outliers$pc = paste0("PC", outliers$pc)
+#     colnames(outliers) = c("samples", "PC")
+# 
+#     pca_data %>% semi_join(outliers, by = c("samples", "PC")) -> outlier_data
+# 
+#     variance <- sprintf("%.2f%%", pca_res$variance)[1:pc95]
+#     names(variance) = paste0("PC", 1:pc95)
+# 
+#     pca_data$PC = paste(pca_data$PC, " [", variance[pca_data$PC], "]", sep="")
+#     outlier_data$PC = paste(outlier_data$PC, " [", variance[outlier_data$PC], "]", sep="")
+#     
+#     # g <- ggplot(pca_data, aes(x = condition, y = rot)) +
+#     #     geom_point() + ggtitle("PCA outlier") + 
+#     #     geom_label(data=outlier_data, aes(label=samples), hjust = 0) +
+#     #     geom_point(data=outlier_data, col="red", size=2) +
+#     #     facet_wrap(~PC)
+#     # print(g)
+#     saveRDS(list(pca_data=pca_data, outlier_data=outlier_data), file="results/rds/pca_outlier_2.rds")
+# }
 
 
 ###############################################################################
@@ -866,29 +915,29 @@ if(nrow(outliers) > 0) {
 
 
 
-if (length(colnames(s)) > 1) {
-  pc <- pca_res$rotated[,1:5]
-  pc <- rownames_to_column(pc, "sample")
-
-  pcl <- pivot_longer(pc, cols=c(paste0("PC", 1:5)), names_to = "PC", values_to = "rot")
-
-  pcl <- cbind(pcl, s[pcl$sample,])
-
-  pcm <- pivot_longer(pcl, cols = colnames(s))
-
-  compl <- list()
-  for(batch in colnames(s)[!(colnames(s) %in% "condition")]) {
-    batchs <- combn(unique(s[[batch]]), 2, simplify = F)
-    compl <- append(compl, batchs)
-  }
-
-  # batch_pca_plot <- ggplot(pcm, aes(x = value, y = rot)) + geom_boxplot() + geom_jitter(width = 0.2) +
-  #   stat_compare_means(comparison=compl, method="wilcox.test") +
-  #   facet_grid(PC~name, scale = "free_x") + ggtitle("PC by batch") +
-  #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  # print(batch_pca_plot)
-  saveRDS(list(pcm=pcm, compl=compl), file="results/rds/batch_pca_plot.rds")
-}
+# if (length(colnames(s)) > 1) {
+#   pc <- pca_res$rotated[,1:5]
+#   pc <- rownames_to_column(pc, "sample")
+# 
+#   pcl <- pivot_longer(pc, cols=c(paste0("PC", 1:5)), names_to = "PC", values_to = "rot")
+# 
+#   pcl <- cbind(pcl, s[pcl$sample,])
+# 
+#   pcm <- pivot_longer(pcl, cols = colnames(s))
+# 
+#   compl <- list()
+#   for(batch in colnames(s)[!(colnames(s) %in% "condition")]) {
+#     batchs <- combn(unique(s[[batch]]), 2, simplify = F)
+#     compl <- append(compl, batchs)
+#   }
+# 
+#   # batch_pca_plot <- ggplot(pcm, aes(x = value, y = rot)) + geom_boxplot() + geom_jitter(width = 0.2) +
+#   #   stat_compare_means(comparison=compl, method="wilcox.test") +
+#   #   facet_grid(PC~name, scale = "free_x") + ggtitle("PC by batch") +
+#   #   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+#   # print(batch_pca_plot)
+#   saveRDS(list(pcm=pcm, compl=compl), file="results/rds/batch_pca_plot.rds")
+# }
 
 ###############################################################################
 
@@ -1017,6 +1066,9 @@ if (length(colnames(s)) > 1) {
 
 
 ##################### HTML Report #############################################
+message(" ----- REPORT")
+
+saveRDS(PASS_FAIL, "results/rds/summary.rds")
 
 folder <- getwd()
 
@@ -1040,6 +1092,7 @@ rmarkdown::render(
 
 
 ##################### WRITE DATA ##############################################
+message(" ----- WRITE DATA")
 
 outfile <- gsub(".html", "", outfile)
 
