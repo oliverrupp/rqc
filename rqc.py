@@ -11,6 +11,7 @@ Usage:
 Example:
     rqc.py /path/to/project --local --conda yes --max-cpus 16
     rqc.py /path/to/project --hpc --max-nodes 10 --subproject subproj1,subproj2
+    rqc.py /path/to/project --list-subprojects
 """
 
 import argparse
@@ -221,7 +222,8 @@ def parse_arguments() -> argparse.Namespace:
 Examples:
   rqc.py /path/to/project --local --conda yes --max-cpus 16
   rqc.py /path/to/project --hpc --max-nodes 10 --subproject subproj1,subproj2
-  rqc.py /path/to/project --dry-run
+  rqc.py /path/to/project --list-subprojects
+  rqc.py /path/to/project --dry-run --local
         """
     )
     
@@ -232,8 +234,15 @@ Examples:
         help="Project directory (default: current directory)"
     )
     
-    # Execution mode
-    mode_group = parser.add_mutually_exclusive_group(required=True)
+    # List subprojects option
+    parser.add_argument(
+        "--list-subprojects",
+        action="store_true",
+        help="List all valid subprojects and exit"
+    )
+    
+    # Execution mode (not required if --list-subprojects is used)
+    mode_group = parser.add_mutually_exclusive_group(required=False)
     mode_group.add_argument(
         "--local",
         action="store_true",
@@ -294,12 +303,46 @@ Examples:
     return parser.parse_args()
 
 
+def list_subprojects(project_dir: Path) -> int:
+    """List all valid subprojects in the project directory."""
+    validator = RQCValidator(project_dir)
+    
+    if not validator.validate_project_structure():
+        logger.error("Project structure validation failed")
+        return 1
+    
+    all_subprojects = validator.find_subprojects()
+    
+    if not all_subprojects:
+        logger.error("No valid subprojects found")
+        return 1
+    
+    # Print subprojects to stdout
+    print(f"\nValid subprojects in {project_dir}:")
+    print("-" * 60)
+    for subproject in sorted(all_subprojects):
+        print(f"  - {subproject}")
+    print("-" * 60)
+    print(f"Total: {len(all_subprojects)} subproject(s)")
+    
+    return 0
+
+
 def main():
     """Main entry point."""
     args = parse_arguments()
     
     # Get script directory
     script_dir = Path(__file__).parent
+    
+    # Handle list-subprojects option
+    if args.list_subprojects:
+        return list_subprojects(Path(args.project_dir))
+    
+    # Execution mode is now required only if not listing subprojects
+    if not args.local and not args.hpc:
+        logger.error("Either --local or --hpc must be specified")
+        sys.exit(1)
     
     # Determine execution mode
     execution_mode = "hpc" if args.hpc else "local"
