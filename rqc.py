@@ -10,7 +10,7 @@ Usage:
 
 Example:
     rqc.py /path/to/project --local --conda yes --max-cpus 16
-    rqc.py /path/to/project --hpc --max-nodes 10 --subproject subproj1,subproj2
+    rqc.py /path/to/project --hpc slurm --max-jobs 10 --hpc-config hpc_config.yaml
     rqc.py /path/to/project --list-subprojects
 """
 
@@ -135,6 +135,15 @@ class RQCValidator:
 class RQCPipeline:
     """Manages RQC pipeline execution."""
     
+    # Supported HPC executors in Snakemake 9
+    SUPPORTED_EXECUTORS = {
+        "slurm": "SLURM job scheduler",
+        "lsf": "LSF job scheduler",
+        "pbs": "PBS/Torque job scheduler",
+        "slurm_singularity": "SLURM with Singularity",
+        "lsf_singularity": "LSF with Singularity"
+    }
+    
     def __init__(self, project_dir: Path, script_dir: Path):
         self.project_dir = Path(project_dir).resolve()
         self.script_dir = Path(script_dir).resolve()
@@ -149,17 +158,39 @@ class RQCPipeline:
         logger.info(f"Snakemake file found: {self.snakemake_file}")
         return True
     
+    def validate_hpc_executor(self, executor: str) -> bool:
+        """Validate that the specified HPC executor is supported."""
+        if executor not in self.SUPPORTED_EXECUTORS:
+            logger.error(f"Unsupported HPC executor: {executor}")
+            logger.error(f"Supported executors: {', '.join(self.SUPPORTED_EXECUTORS.keys())}")
+            return False
+        
+        logger.info(f"Using HPC executor: {executor} ({self.SUPPORTED_EXECUTORS[executor]})")
+        return True
+    
+    def validate_hpc_config(self, hpc_config: Optional[Path]) -> bool:
+        """Validate that HPC config file exists if provided."""
+        if hpc_config:
+            if not hpc_config.exists():
+                logger.error(f"HPC config file not found: {hpc_config}")
+                return False
+            logger.info(f"Using HPC config file: {hpc_config}")
+        
+        return True
+    
     def build_snakemake_command(
         self,
         execution_mode: str,
         use_conda: bool,
         max_cpus: int,
-        max_nodes: int,
+        max_jobs: int,
         dry_run: bool,
+        executor: Optional[str] = None,
+        hpc_config: Optional[Path] = None,
         subprojects: Optional[List[str]] = None,
         config_file: Optional[Path] = None
     ) -> List[str]:
-        """Build the Snakemake command with all options."""
+        """Build the Snakemake command with all options (Snakemake 9 compatible)."""
         cmd = ["snakemake", "-s", str(self.snakemake_file)]
         
         # Add workflow directory
@@ -167,10 +198,15 @@ class RQCPipeline:
         
         # Add execution mode
         if execution_mode == "hpc":
-            # Example for HPC cluster (adjust based on your cluster type)
-            cmd.append("--cluster")
-            cmd.append("sbatch")  # or qsub, bsub, etc.
-            cmd.extend(["--jobs", str(max_nodes)])
+            # Snakemake 9 uses --executor option
+            cmd.extend(["--executor", executor])
+            
+            # Add HPC config file (Snakemake profile)
+            if hpc_config:
+                cmd.extend(["--profile", str(hpc_config)])
+            
+            # Add max-jobs for HPC execution
+            cmd.extend(["--max-jobs", str(max_jobs)])
         else:  # local
             cmd.extend(["--cores", str(max_cpus)])
         
@@ -180,17 +216,17 @@ class RQCPipeline:
         
         # Add dry run
         if dry_run:
-            cmd.append("--dryrun")
+            cmd.append("--dry-run")
         
-        # Add config file
+        # Add config file (in addition to profile for HPC)
         if config_file:
             cmd.extend(["--configfile", str(config_file)])
         
         # Add target rule or subprojects
         if subprojects:
             # Create output targets for specified subprojects
-            targets = [f"'{sp}/report/samples.report.html'" for sp in subprojects]
-            cmd.append(" ".join(targets))
+            targets = [f"{sp}/report/samples.report.html" for sp in subprojects]
+            cmd.extend(targets)
         else:
             # Default: run report rule
             cmd.append("report")
@@ -203,8 +239,7 @@ class RQCPipeline:
         
         try:
             result = subprocess.run(
-                " ".join(cmd),
-                shell=True,
+                cmd,
                 cwd=str(self.project_dir)
             )
             return result.returncode
@@ -221,9 +256,18 @@ def parse_arguments() -> argparse.Namespace:
         epilog="""
 Examples:
   rqc.py /path/to/project --local --conda yes --max-cpus 16
-  rqc.py /path/to/project --hpc --max-nodes 10 --subproject subproj1,subproj2
+  rqc.py /path/to/project --hpc slurm --max-jobs 100
+  rqc.py /path/to/project --hpc slurm --max-jobs 100 --hpc-config profile.yaml
+  rqc.py /path/to/project --hpc lsf --max-jobs 50 --subproject subproj1,subproj2
   rqc.py /path/to/project --list-subprojects
   rqc.py /path/to/project --dry-run --local
+
+Supported HPC executors:
+  slurm              SLURM job scheduler
+  lsf                LSF job scheduler
+  pbs                PBS/Torque job scheduler
+  slurm_singularity  SLURM with Singularity
+  lsf_singularity    LSF with Singularity
         """
     )
     
@@ -250,8 +294,9 @@ Examples:
     )
     mode_group.add_argument(
         "--hpc",
-        action="store_true",
-        help="Run pipeline on HPC cluster"
+        type=str,
+        metavar="EXECUTOR",
+        help="Run pipeline on HPC cluster with specified executor (slurm, lsf, pbs, slurm_singularity, lsf_singularity)"
     )
     
     # Conda
@@ -267,14 +312,21 @@ Examples:
         "--max-cpus",
         type=int,
         default=8,
-        help="Maximum CPUs per job for local execution (default: 8)"
+        help="Maximum CPUs for local execution (default: 8)"
     )
     
     parser.add_argument(
-        "--max-nodes",
+        "--max-jobs",
         type=int,
-        default=1,
-        help="Maximum number of HPC nodes (default: 1)"
+        default=100,
+        help="Maximum parallel jobs for HPC execution (default: 100)"
+    )
+    
+    # HPC-specific options
+    parser.add_argument(
+        "--hpc-config",
+        type=Path,
+        help="Snakemake HPC profile/config file (YAML format)"
     )
     
     # Subprojects
@@ -397,14 +449,26 @@ def main():
         logger.error("Snakemake validation failed")
         sys.exit(1)
     
+    # HPC-specific validation
+    if execution_mode == "hpc":
+        if not pipeline.validate_hpc_executor(args.hpc):
+            logger.error("HPC executor validation failed")
+            sys.exit(1)
+        
+        if not pipeline.validate_hpc_config(args.hpc_config):
+            logger.error("HPC config validation failed")
+            sys.exit(1)
+    
     # Build Snakemake command
     logger.info("Building Snakemake command...")
     cmd = pipeline.build_snakemake_command(
         execution_mode=execution_mode,
         use_conda=use_conda,
         max_cpus=args.max_cpus,
-        max_nodes=args.max_nodes,
+        max_jobs=args.max_jobs,
         dry_run=args.dry_run,
+        executor=args.hpc,
+        hpc_config=args.hpc_config,
         subprojects=selected_subprojects,
         config_file=args.config
     )
