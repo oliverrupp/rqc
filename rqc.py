@@ -6,12 +6,13 @@ A Python wrapper script for running the Snakemake-based RQC pipeline.
 Handles input validation, configuration management, and Snakemake execution.
 
 Usage:
-    rqc.py [OPTIONS] [PROJECT_DIRECTORY]
+    rqc.py [OPTIONS]
 
 Example:
-    rqc.py /path/to/project --conda yes --max-cpus 16
-    rqc.py /path/to/project --hpc slurm --max-jobs 10 --hpc-config hpc_config.yaml
-    rqc.py /path/to/project --list-subprojects
+    rqc.py --conda yes --max-cpus 16
+    rqc.py --hpc slurm --max-jobs 10 --hpc-config hpc_config.yaml
+    rqc.py --list-subprojects
+    rqc.py /path/to/project --conda yes
 """
 
 import argparse
@@ -255,12 +256,13 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  rqc.py /path/to/project --conda yes --max-cpus 16
-  rqc.py /path/to/project --hpc slurm --max-jobs 100
-  rqc.py /path/to/project --hpc slurm --max-jobs 100 --hpc-config profile.yaml
-  rqc.py /path/to/project --hpc lsf --max-jobs 50 --subproject subproj1,subproj2
-  rqc.py /path/to/project --list-subprojects
-  rqc.py /path/to/project --dry-run
+  rqc.py --conda yes --max-cpus 16
+  rqc.py --hpc slurm --max-jobs 100
+  rqc.py --hpc slurm --max-jobs 100 --hpc-config profile.yaml
+  rqc.py --hpc lsf --max-jobs 50 --subproject subproj1,subproj2
+  rqc.py --list-subprojects
+  rqc.py --dry-run
+  rqc.py /path/to/project --conda yes
 
 Supported HPC executors:
   slurm              SLURM job scheduler
@@ -274,8 +276,8 @@ Supported HPC executors:
     parser.add_argument(
         "project_dir",
         nargs="?",
-        default=os.getcwd(),
-        help="Project directory (default: current directory)"
+        default=None,
+        help="Project directory (default: current working directory)"
     )
     
     # List subprojects option
@@ -381,21 +383,25 @@ def main():
     # Get script directory
     script_dir = Path(__file__).parent
     
+    # Determine project directory (use current working directory if not specified)
+    project_dir = Path(args.project_dir) if args.project_dir else Path.cwd()
+    
     # Handle list-subprojects option
     if args.list_subprojects:
-        return list_subprojects(Path(args.project_dir))
+        return list_subprojects(project_dir)
     
     # Determine execution mode (defaults to local if --hpc not specified)
     execution_mode = "hpc" if args.hpc else "local"
     use_conda = args.conda == "yes"
     
     logger.info(f"RNA Quality Control (RQC) Pipeline Wrapper")
+    logger.info(f"Project directory: {project_dir}")
     logger.info(f"Execution mode: {execution_mode}")
     logger.info(f"Conda support: {use_conda}")
     
     # Validate project structure
     logger.info("Validating project structure...")
-    validator = RQCValidator(args.project_dir)
+    validator = RQCValidator(project_dir)
     
     if not validator.validate_project_structure():
         logger.error("Project structure validation failed")
@@ -432,7 +438,7 @@ def main():
     
     # Validate Snakemake file
     logger.info("Validating Snakemake configuration...")
-    pipeline = RQCPipeline(args.project_dir, script_dir)
+    pipeline = RQCPipeline(project_dir, script_dir)
     
     if not pipeline.validate_snakemake_file():
         logger.error("Snakemake validation failed")
