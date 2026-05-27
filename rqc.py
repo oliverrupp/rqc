@@ -9,7 +9,7 @@ Usage:
     rqc.py [OPTIONS] [PROJECT_DIRECTORY]
 
 Example:
-    rqc.py /path/to/project --local --conda yes --max-cpus 16
+    rqc.py /path/to/project --conda yes --max-cpus 16
     rqc.py /path/to/project --hpc slurm --max-jobs 10 --hpc-config hpc_config.yaml
     rqc.py /path/to/project --list-subprojects
 """
@@ -207,7 +207,7 @@ class RQCPipeline:
             
             # Add max-jobs for HPC execution
             cmd.extend(["--max-jobs", str(max_jobs)])
-        else:  # local
+        else:  # local (default)
             cmd.extend(["--cores", str(max_cpus)])
         
         # Add conda support
@@ -255,12 +255,12 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  rqc.py /path/to/project --local --conda yes --max-cpus 16
+  rqc.py /path/to/project --conda yes --max-cpus 16
   rqc.py /path/to/project --hpc slurm --max-jobs 100
   rqc.py /path/to/project --hpc slurm --max-jobs 100 --hpc-config profile.yaml
   rqc.py /path/to/project --hpc lsf --max-jobs 50 --subproject subproj1,subproj2
   rqc.py /path/to/project --list-subprojects
-  rqc.py /path/to/project --dry-run --local
+  rqc.py /path/to/project --dry-run
 
 Supported HPC executors:
   slurm              SLURM job scheduler
@@ -285,18 +285,12 @@ Supported HPC executors:
         help="List all valid subprojects and exit"
     )
     
-    # Execution mode (not required if --list-subprojects is used)
-    mode_group = parser.add_mutually_exclusive_group(required=False)
-    mode_group.add_argument(
-        "--local",
-        action="store_true",
-        help="Run pipeline on local machine"
-    )
-    mode_group.add_argument(
+    # HPC execution (optional - defaults to local if not specified)
+    parser.add_argument(
         "--hpc",
         type=str,
         metavar="EXECUTOR",
-        help="Run pipeline on HPC cluster with specified executor (slurm, lsf, pbs, slurm_singularity, lsf_singularity)"
+        help="Run pipeline on HPC cluster with specified executor (slurm, lsf, pbs, slurm_singularity, lsf_singularity). Default: local execution"
     )
     
     # Conda
@@ -391,12 +385,7 @@ def main():
     if args.list_subprojects:
         return list_subprojects(Path(args.project_dir))
     
-    # Execution mode is now required only if not listing subprojects
-    if not args.local and not args.hpc:
-        logger.error("Either --local or --hpc must be specified")
-        sys.exit(1)
-    
-    # Determine execution mode
+    # Determine execution mode (defaults to local if --hpc not specified)
     execution_mode = "hpc" if args.hpc else "local"
     use_conda = args.conda == "yes"
     
