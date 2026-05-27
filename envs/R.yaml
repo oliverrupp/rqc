@@ -5,23 +5,15 @@ channels:
 dependencies:
  - r-getopt
  - r-gtools
- - r-ggplot2
- - r-ggally
- - r-ggpubr
- - r-reshape2
- - r-pheatmap
- - r-jsonlite
- - r-stringr
- - r-rjson
  - r-tidyverse
- - r-moments
- - r-xlsx
+ - r-filelock
+ - r-pracma
  - r-flexdashboard
  - r-plotly
  - r-dt
  - r-heatmaply
+ - r-ggally
+ - r-jsonlite 
  - bioconductor-tximeta
  - bioconductor-deseq2
  - bioconductor-edger
- - bioconductor-pcatools
- - bioconductor-complexheatmap

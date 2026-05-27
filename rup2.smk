@@ -6,45 +6,58 @@ localrules: report, index, trim, quant, quant_rrna, quant_quantiles, gentrome, g
 
 
 
-(PLANTS, )=glob_wildcards('{plants}/reference/samples.tsv')
+(PLANTS, GROUPS, )=glob_wildcards('{plants}/reference/samples{groups}.tsv')
 (PLANTS2, SAMPLES, PE, )=glob_wildcards('{plants}/reads/{samples}_{s}.fq.gz')
 
 
 
 def get_inputs(plant, type):
     for p in zip(PLANTS2, SAMPLES):
-            filetocheck_1 = "%s/reads/%s_1.fq.gz" % (p[0], p[1])
-            filetocheck_2 = "%s/reads/%s_2.fq.gz" % (p[0], p[1])
-            filetocheck_s = "%s/reads/%s_s.fq.gz" % (p[0], p[1])
-
-            if(p[0] == plant and ((os.path.isfile(filetocheck_1) and os.path.isfile(filetocheck_2)) or os.path.isfile(filetocheck_s))):
-                match type:
-                    case "trimmed":
-                        yield("{plant}/results/trimmed/{sample}.json").format(plant=p[0], sample=p[1])
-                    case "bam":
-                        yield("{plant}/results/bam/{sample}/STARAligned.sorted.bam").format(plant=p[0], sample=p[1])
-                    case "gtf":
-                        yield("{plant}/results/scallop/{sample}/scallop.gtf").format(plant=p[0], sample=p[1])
-                    case "qc_untrimmed":
-                        if(os.path.isfile(filetocheck_s)):
-                            yield("{plant}/results/falco/untrimmed/{sample}_s.fq.gz").format(plant=p[0], sample=p[1])
-                        else:
-                            yield("{plant}/results/falco/untrimmed/{sample}_1.fq.gz").format(plant=p[0], sample=p[1])
-                            yield("{plant}/results/falco/untrimmed/{sample}_2.fq.gz").format(plant=p[0], sample=p[1])
-                    case "qc_trimmed":
-                        if(os.path.isfile(filetocheck_s)):
-                            yield("{plant}/results/falco/trimmed/{sample}_S.fastq.gz").format(plant=p[0], sample=p[1])
-                        else:
-                            yield("{plant}/results/falco/trimmed/{sample}_R1.fastq.gz").format(plant=p[0], sample=p[1])
-                            yield("{plant}/results/falco/trimmed/{sample}_R2.fastq.gz").format(plant=p[0], sample=p[1])
-                    case _:
-                        yield("{plant}/results/{type}/{sample}/quant.sf").format(plant=p[0], type=type, sample=p[1])
+        filetocheck_1 = "%s/reads/%s_1.fq.gz" % (p[0], p[1])
+        filetocheck_2 = "%s/reads/%s_2.fq.gz" % (p[0], p[1])
+        filetocheck_s = "%s/reads/%s_s.fq.gz" % (p[0], p[1])
+        
+        if(p[0] == plant and ((os.path.isfile(filetocheck_1) and os.path.isfile(filetocheck_2)) or os.path.isfile(filetocheck_s))):
+            match type:
+                case "trimmed":
+                    yield("{plant}/results/trimmed/{sample}.json").format(plant=p[0], sample=p[1])
+                case "bam":
+                    yield("{plant}/results/bam/{sample}/STARAligned.sorted.bam").format(plant=p[0], sample=p[1])
+                case "gtf":
+                    yield("{plant}/results/scallop/{sample}/scallop.gtf").format(plant=p[0], sample=p[1])
+                case "qc_untrimmed":
+                    if(os.path.isfile(filetocheck_s)):
+                        yield("{plant}/results/falco/untrimmed/{sample}_s.fq.gz").format(plant=p[0], sample=p[1])
+                    else:
+                        yield("{plant}/results/falco/untrimmed/{sample}_1.fq.gz").format(plant=p[0], sample=p[1])
+                        yield("{plant}/results/falco/untrimmed/{sample}_2.fq.gz").format(plant=p[0], sample=p[1])
+                case "qc_trimmed":
+                    if(os.path.isfile(filetocheck_s)):
+                        yield("{plant}/results/falco/trimmed/{sample}_S.fastq.gz").format(plant=p[0], sample=p[1])
+                    else:
+                        yield("{plant}/results/falco/trimmed/{sample}_R1.fastq.gz").format(plant=p[0], sample=p[1])
+                        yield("{plant}/results/falco/trimmed/{sample}_R2.fastq.gz").format(plant=p[0], sample=p[1])
+                case _:
+                    yield("{plant}/results/{type}/{sample}/quant.sf").format(plant=p[0], type=type, sample=p[1])
                         
 
 
+def get_sample_report_files():
+    for p in zip(PLANTS, GROUPS):
+        samples_file = "%s/reference/samples%s.tsv" % (p[0], p[1])
+
+        if(os.path.isfile(samples_file)):
+           yield("{plant}/report/samples{group}.report.html").format(plant=p[0], group=p[1])
+
+    for p in PLANTS:
+        samples_file = "%s/reference/samples.tsv" % (p)
+        if(os.path.isfile(samples_file)):
+            yield("{plant}/report/samples.report.html").format(plant=p)
+
+
+
 rule report:
-    input:
-        expand('{plant}/{plant}.report.html', plant=PLANTS)
+    input: lambda wildcards: get_sample_report_files()
 
 
 
@@ -550,25 +563,27 @@ rule assembly:
     shell: """
            stringtie --merge -o {output} -G {input.reference} -p 12 --fr --conservative {input.gtf}
            """
-    
-           
 
-rule report_html:
+
+            
+rule report_template:
     input:
-        '{plant}/reference/samples.tsv',
-        lambda wildcards: get_inputs(wildcards.plant, "trimmed"),
-        lambda wildcards: get_inputs(wildcards.plant, "salmon"),
-        lambda wildcards: get_inputs(wildcards.plant, "salmon_rrna"),
-        lambda wildcards: get_inputs(wildcards.plant, "salmon_quantiles"),
-        lambda wildcards: get_inputs(wildcards.plant, "qc_untrimmed"),
-        lambda wildcards: get_inputs(wildcards.plant, "qc_trimmed")
+        samples='{plant}/reference/samples{group}.tsv',
+        trimmed=lambda wildcards: get_inputs(wildcards.plant, "trimmed"),
+        salmon=lambda wildcards: get_inputs(wildcards.plant, "salmon"),
+        salmon_rrna=lambda wildcards: get_inputs(wildcards.plant, "salmon_rrna"),
+        salmon_quantiles=lambda wildcards: get_inputs(wildcards.plant, "salmon_quantiles"),
+        qc_untrimmed=lambda wildcards: get_inputs(wildcards.plant, "qc_untrimmed"),
+        qc_trimmed=lambda wildcards: get_inputs(wildcards.plant, "qc_trimmed")
     output:
-        report='{plant}/{plant}.report.html'
+        report='{plant}/report/samples{group}.report.html'
+    wildcard_constraints:
+        group = ".*"
     conda: "envs/R.yaml"
     threads: 1
-    benchmark: "{plant}/benchmark/report_html.txt"
-    params: reads=config.get("reads", 1000000)
-    script: "scripts/rup2.R"
+    benchmark: "{plant}/benchmark/samples{group}.report_html.txt"
+    script: "scripts/rqc.R"
+
 
 
 
