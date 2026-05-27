@@ -35,12 +35,12 @@ class RQCValidator:
     """Validates project directory structure and input files."""
     
     REQUIRED_GENOME_FILE = "reference/genome.fa"
-    REQUIRED_ANNOTATION_FILE = "reference/annotation.gff3"
+    REQUIRED_ANNOTATION_FILE = "reference/annotation.gtf"
     REQUIRED_SAMPLES_FILE = "reference/samples.tsv"
     READS_PATTERNS = [
-        "reads/*_1.fastq.gz",
-        "reads/*_2.fastq.gz",
-        "reads/*_s.fastq.gz"
+        "reads/*_1.fq.gz",
+        "reads/*_2.fq.gz",
+        "reads/*_s.fq.gz"
     ]
     
     def __init__(self, project_dir: Path):
@@ -106,9 +106,9 @@ class RQCValidator:
             return False
         
         # Check for at least one reads file
-        reads_files = list(reads_dir.glob("*.fastq.gz"))
+        reads_files = list(reads_dir.glob("*.fq.gz"))
         if not reads_files:
-            logger.debug(f"No .fastq.gz files found in {subproject_path.name}/reads")
+            logger.debug(f"No .fq.gz files found in {subproject_path.name}/reads")
             return False
         
         # Validate samples.tsv has required columns
