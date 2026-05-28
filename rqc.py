@@ -36,7 +36,8 @@ class RQCValidator:
     """Validates project directory structure and input files."""
     
     REQUIRED_GENOME_FILE = "reference/genome.fa"
-    REQUIRED_ANNOTATION_FILE = "reference/annotation.gtf"
+    REQUIRED_ANNOTATION_GTF_FILE = "reference/annotation.gtf"
+    REQUIRED_ANNOTATION_GFF3_FILE = "reference/annotation.gff3"
     REQUIRED_SAMPLES_FILE = "reference/samples.tsv"
     READS_PATTERNS = [
         "reads/*_1.fq.gz",
@@ -75,7 +76,7 @@ class RQCValidator:
         if not subprojects:
             logger.error(f"No valid subprojects found in {self.project_dir}")
             logger.error(f"Subprojects must contain: {self.REQUIRED_GENOME_FILE}, "
-                        f"{self.REQUIRED_ANNOTATION_FILE}, {self.REQUIRED_SAMPLES_FILE}, "
+                        f"{self.REQUIRED_ANNOTATION_GFF3_FILE} or {self.REQUIRED_ANNOTATION_GFF3_FILE}, {self.REQUIRED_SAMPLES_FILE}, "
                         f"and reads files")
             return set()
         
@@ -86,7 +87,8 @@ class RQCValidator:
         """Validate a single subproject has required files."""
         # Check required reference files
         genome_file = subproject_path / self.REQUIRED_GENOME_FILE
-        annotation_file = subproject_path / self.REQUIRED_ANNOTATION_FILE
+        annotation_gtf_file = subproject_path / self.REQUIRED_ANNOTATION_GTF_FILE
+        annotation_gff3_file = subproject_path / self.REQUIRED_ANNOTATION_GFF3_FILE
         samples_file = subproject_path / self.REQUIRED_SAMPLES_FILE
         reads_dir = subproject_path / "reads"
         
@@ -94,8 +96,8 @@ class RQCValidator:
             logger.debug(f"Missing {self.REQUIRED_GENOME_FILE} in {subproject_path.name}")
             return False
         
-        if not annotation_file.exists():
-            logger.debug(f"Missing {self.REQUIRED_ANNOTATION_FILE} in {subproject_path.name}")
+        if not (annotation_gff3_file.exists() or annotation_gtf_file.exists()):
+            logger.debug(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE} in {subproject_path.name}")
             return False
         
         if not samples_file.exists():
