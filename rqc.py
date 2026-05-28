@@ -194,7 +194,7 @@ class RQCPipeline:
         config_file: Optional[Path] = None
     ) -> List[str]:
         """Build the Snakemake command with all options (Snakemake 9 compatible)."""
-        cmd = ["snakemake", "-s", str(self.snakemake_file)]
+        cmd = ["snakemake", "--benchmark-extended", "-s", str(self.snakemake_file)]
         
         # Add workflow directory
         cmd.extend(["--directory", str(self.project_dir)])
