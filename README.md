@@ -28,14 +28,14 @@ rqc.py --hpc slurm --max-jobs 100
 
 ## Documentation
 
-- **[Installation & Setup](docs/INSTALLATION.md)** - Requirements and installation instructions
-- **[Project Structure](docs/PROJECT_STRUCTURE.md)** - How to organize your data
-- **[Usage Guide](docs/USAGE.md)** - Command-line usage and examples
-- **[Parameters Reference](docs/PARAMETERS.md)** - Detailed parameter documentation
-- **[QC Metrics](docs/QC_METRICS.md)** - Available quality control metrics
-- **[Output Files](docs/OUTPUT.md)** - Output directory structure and generated files
-- **[HPC Configuration](docs/HPC_CONFIG.md)** - Setting up HPC execution
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- [Installation & Setup](docs/INSTALLATION.md) - Requirements and installation instructions
+- [Project Structure](docs/PROJECT_STRUCTURE.md) - How to organize your data
+- [Usage Guide](docs/USAGE.md) - Command-line usage and examples
+- [Parameters Reference](docs/PARAMETERS.md) - Detailed parameter documentation
+- [QC Metrics](docs/QC_METRICS.md) - Available quality control metrics
+- [Output Files](docs/OUTPUT.md) - Output directory structure and generated files
+- [HPC Configuration](docs/HPC_CONFIG.md) - Setting up HPC execution
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ## Requirements
 
