@@ -396,7 +396,7 @@ def main():
     execution_mode = "hpc" if args.hpc else "local"
     use_conda = args.conda == "yes"
     
-    logger.info(f"RNA Quality Control (RQC) Pipeline Wrapper")
+    logger.info(f"RNA Quality Control (RQC) Pipeline")
     logger.info(f"Project directory: {project_dir}")
     logger.info(f"Execution mode: {execution_mode}")
     logger.info(f"Conda support: {use_conda}")

@@ -49,7 +49,7 @@ def get_sample_report_files():
         if(os.path.isfile(samples_file)):
            yield("{plant}/report/samples{group}.report.html").format(plant=p[0], group=p[1])
 
-    for p in PLANTS:
+    for p in PLANTS2:
         samples_file = "%s/reference/samples.tsv" % (p)
         if(os.path.isfile(samples_file)):
             yield("{plant}/report/samples.report.html").format(plant=p)
