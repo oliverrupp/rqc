@@ -60,34 +60,41 @@ class RQCValidator:
         
         logger.info(f"Project directory found: {self.project_dir}")
         return True
+
     
-    def find_subprojects(self) -> Set[str]:
+    def find_subprojects(self, verbose: bool = True) -> Set[str]:
         """Find all valid subproject directories."""
         subprojects = set()
         
         for item in self.project_dir.iterdir():
             if item.is_dir() and not item.name.startswith('.'):
                 subproject_path = item
-                print("")
-                logger.info(f"Checking subfolder {subproject_path}")
+                if verbose:
+                    print("")
+                    logger.info(f"Checking subfolder {subproject_path}")
                 
                 # Check if it has the required structure
-                if self._validate_subproject(subproject_path):
+                if self._validate_subproject(subproject_path, verbose=verbose):
                     subprojects.add(item.name)
-                    logger.info(f"{subproject_path} OK")
-        print("")
+                    if verbose:
+                        logger.info(f"OK")
+        if verbose:
+            print("")
         
         if not subprojects:
-            logger.error(f"No valid subprojects found in {self.project_dir}")
-            logger.error(f"Subprojects must contain: {self.REQUIRED_GENOME_FILE}, "
-                        f"{self.REQUIRED_ANNOTATION_GFF3_FILE} or {self.REQUIRED_ANNOTATION_GFF3_FILE}, {self.REQUIRED_SAMPLES_FILE}, "
-                        f"and reads files")
+            if verbose:
+                logger.error(f"No valid subprojects found in {self.project_dir}")
+                logger.error(f"Subprojects must contain: {self.REQUIRED_GENOME_FILE}, "
+                             f"{self.REQUIRED_ANNOTATION_GFF3_FILE} or {self.REQUIRED_ANNOTATION_GFF3_FILE}, {self.REQUIRED_SAMPLES_FILE}, "
+                             f"and reads files")
             return set()
-        
-        logger.info(f"Found {len(subprojects)} valid subproject(s): {sorted(subprojects)}")
+
+        if verbose:
+            logger.info(f"Found {len(subprojects)} valid subproject(s): {sorted(subprojects)}")
+            
         return subprojects
     
-    def _validate_subproject(self, subproject_path: Path) -> bool:
+    def _validate_subproject(self, subproject_path: Path, verbose: bool = True) -> bool:
         """Validate a single subproject has required files."""
         # Check required reference files
         genome_file = subproject_path / self.REQUIRED_GENOME_FILE
@@ -97,34 +104,62 @@ class RQCValidator:
         reads_dir = subproject_path / "reads"
         
         if not genome_file.exists():
-            logger.error(f"Missing {self.REQUIRED_GENOME_FILE} in {subproject_path.name}")
+            if verbose:
+                logger.error(f"Missing {self.REQUIRED_GENOME_FILE} in {subproject_path.name}")
             return False
         
         if not (annotation_gff3_file.exists() or annotation_gtf_file.exists()):
-            logger.error(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE} in {subproject_path.name}")
+            if verbose:
+                logger.error(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE} in {subproject_path.name}")
             return False
         
         if not samples_file.exists():
-            logger.error(f"Missing {self.REQUIRED_SAMPLES_FILE} in {subproject_path.name}")
+            if verbose:
+                logger.error(f"Missing {self.REQUIRED_SAMPLES_FILE} in {subproject_path.name}")
             return False
         
         if not reads_dir.exists() or not reads_dir.is_dir():
-            logger.error(f"Missing reads directory in {subproject_path.name}")
+            if verbose:
+                logger.error(f"Missing reads directory in {subproject_path.name}")
             return False
         
         # Check for at least one reads file
         reads_files = list(reads_dir.glob("*.fq.gz"))
         if not reads_files:
-            logger.error(f"No .fq.gz files found in {subproject_path.name}/reads")
+            if verbose:
+                logger.error(f"No .fq.gz files found in {subproject_path.name}/reads")
             return False
         
         # Validate samples.tsv has required columns
         if not self._validate_samples_tsv(samples_file):
-            logger.error(f"Invalid samples.tsv in {subproject_path.name}")
+            if verbose:
+                logger.error(f"Invalid samples.tsv in {subproject_path.name}")
             return False
         
         return True
     
+
+    def get_subproject_memory_requirements(self) -> dict:
+        """Return memory requirements (GB) for all valid subprojects."""
+        result = {}
+
+        for subproject in sorted(self.find_subprojects(verbose=False)):
+            genome_file = (
+                self.project_dir /
+                subproject /
+                self.REQUIRED_GENOME_FILE
+            )
+
+            size_gb = genome_file.stat().st_size / (1024**3)
+            required_mem_gb = size_gb * 15
+
+            result[subproject] = {
+                "genome_size_gb": size_gb,
+                "required_mem_gb": required_mem_gb
+            }
+
+        return result
+
     def _validate_samples_tsv(self, samples_file: Path) -> bool:
         """Validate samples.tsv has at least 'condition' and 'sample' columns."""
         try:
@@ -367,25 +402,40 @@ Supported HPC executors:
 def list_subprojects(project_dir: Path) -> int:
     """List all valid subprojects in the project directory."""
     validator = RQCValidator(project_dir)
-    
+
     if not validator.validate_project_structure():
         logger.error("Project structure validation failed")
         return 1
-    
+
     all_subprojects = validator.find_subprojects()
-    
+
     if not all_subprojects:
         logger.error("No valid subprojects found")
         return 1
-    
-    # Print subprojects to stdout
+
+    mem_info = validator.get_subproject_memory_requirements()
+
     print(f"\nValid subprojects in {project_dir}:")
-    print("-" * 60)
+    print("-" * 80)
+    print(f"{'Subproject':30s} {'Genome (GB)':>12s} {'Mem. Req. (GB)':>15s}")
+    print("-" * 80)
+
     for subproject in sorted(all_subprojects):
-        print(f"  - {subproject}")
-    print("-" * 60)
+        info = mem_info[subproject]
+        print(
+            f"{subproject:30s} "
+            f"{info['genome_size_gb']:12.2f} "
+            f"{info['required_mem_gb']:15.1f}"
+        )
+
+    max_required_mem_gb = max(
+        x["required_mem_gb"] for x in mem_info.values()
+    )
+
+    print("-" * 80)
     print(f"Total: {len(all_subprojects)} subproject(s)")
-    
+    print(f"Maximum required memory: {max_required_mem_gb:.1f} GB")
+
     return 0
 
 
