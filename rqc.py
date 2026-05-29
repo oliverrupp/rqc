@@ -9,10 +9,10 @@ Usage:
     rqc.py [OPTIONS]
 
 Example:
-    rqc.py --conda yes --max-cpus 16
+    rqc.py --no-conda --max-cpus 16
     rqc.py --hpc slurm --max-jobs 10 --hpc-config hpc_config.yaml
     rqc.py --list-subprojects
-    rqc.py /path/to/project --conda yes
+    rqc.py /path/to/project -no-conda
 """
 
 import argparse
@@ -68,10 +68,14 @@ class RQCValidator:
         for item in self.project_dir.iterdir():
             if item.is_dir() and not item.name.startswith('.'):
                 subproject_path = item
+                print("")
+                logger.info(f"Checking subfolder {subproject_path}")
                 
                 # Check if it has the required structure
                 if self._validate_subproject(subproject_path):
                     subprojects.add(item.name)
+                    logger.info(f"{subproject_path} OK")
+        print("")
         
         if not subprojects:
             logger.error(f"No valid subprojects found in {self.project_dir}")
@@ -93,30 +97,30 @@ class RQCValidator:
         reads_dir = subproject_path / "reads"
         
         if not genome_file.exists():
-            logger.debug(f"Missing {self.REQUIRED_GENOME_FILE} in {subproject_path.name}")
+            logger.error(f"Missing {self.REQUIRED_GENOME_FILE} in {subproject_path.name}")
             return False
         
         if not (annotation_gff3_file.exists() or annotation_gtf_file.exists()):
-            logger.debug(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE} in {subproject_path.name}")
+            logger.error(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE} in {subproject_path.name}")
             return False
         
         if not samples_file.exists():
-            logger.debug(f"Missing {self.REQUIRED_SAMPLES_FILE} in {subproject_path.name}")
+            logger.error(f"Missing {self.REQUIRED_SAMPLES_FILE} in {subproject_path.name}")
             return False
         
         if not reads_dir.exists() or not reads_dir.is_dir():
-            logger.debug(f"Missing reads directory in {subproject_path.name}")
+            logger.error(f"Missing reads directory in {subproject_path.name}")
             return False
         
         # Check for at least one reads file
         reads_files = list(reads_dir.glob("*.fq.gz"))
         if not reads_files:
-            logger.debug(f"No .fq.gz files found in {subproject_path.name}/reads")
+            logger.error(f"No .fq.gz files found in {subproject_path.name}/reads")
             return False
         
         # Validate samples.tsv has required columns
         if not self._validate_samples_tsv(samples_file):
-            logger.debug(f"Invalid samples.tsv in {subproject_path.name}")
+            logger.error(f"Invalid samples.tsv in {subproject_path.name}")
             return False
         
         return True
@@ -127,11 +131,11 @@ class RQCValidator:
             with open(samples_file, 'r') as f:
                 header = f.readline().strip().split('\t')
                 if 'condition' not in header or 'sample' not in header:
-                    logger.debug(f"samples.tsv missing 'condition' or 'sample' column")
+                    logger.error(f"samples.tsv missing 'condition' or 'sample' column")
                     return False
             return True
         except Exception as e:
-            logger.debug(f"Error reading samples.tsv: {e}")
+            logger.error(f"Error reading samples.tsv: {e}")
             return False
 
 
@@ -258,13 +262,14 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  rqc.py --conda yes --max-cpus 16
+  rqc.py --no-conda --max-cpus 16
   rqc.py --hpc slurm --max-jobs 100
   rqc.py --hpc slurm --max-jobs 100 --hpc-config profile.yaml
   rqc.py --hpc lsf --max-jobs 50 --subproject subproj1,subproj2
   rqc.py --list-subprojects
   rqc.py --dry-run
-  rqc.py /path/to/project --conda yes
+  rqc.py --validate
+  rqc.py /path/to/project 
 
 Supported HPC executors:
   slurm              SLURM job scheduler
@@ -299,10 +304,9 @@ Supported HPC executors:
     
     # Conda
     parser.add_argument(
-        "--conda",
-        choices=["yes", "no"],
-        default="yes",
-        help="Use conda environments (default: yes)"
+        "--no-conda",
+        action="store_true",
+        help="Do not use conda environments (default: use conda)"
     )
     
     # Resource options
@@ -340,7 +344,14 @@ Supported HPC executors:
         action="store_true",
         help="Perform a dry run without executing jobs"
     )
-    
+
+    # just validate
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Validate the project folder and all subfolders"
+    )
+
     # Config file
     parser.add_argument(
         "--config",
@@ -381,7 +392,7 @@ def list_subprojects(project_dir: Path) -> int:
 def main():
     """Main entry point."""
     args = parse_arguments()
-    
+
     # Get script directory
     script_dir = Path(__file__).parent
     
@@ -394,7 +405,7 @@ def main():
     
     # Determine execution mode (defaults to local if --hpc not specified)
     execution_mode = "hpc" if args.hpc else "local"
-    use_conda = args.conda == "yes"
+    use_conda = not args.no_conda 
     
     logger.info(f"RNA Quality Control (RQC) Pipeline")
     logger.info(f"Project directory: {project_dir}")
@@ -473,7 +484,12 @@ def main():
     # Run Snakemake
     if args.dry_run:
         logger.info("Running in DRY RUN mode - no jobs will be executed")
-    
+
+    if args.validate:
+        logger.info(f"validation OK")
+        logger.info(f"{" ".join(cmd)}")
+        sys.exit(0)
+        
     logger.info("Starting pipeline execution...")
     returncode = pipeline.run_snakemake(cmd)
     

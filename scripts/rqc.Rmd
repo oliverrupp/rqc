@@ -177,7 +177,7 @@ ggplotly(ggplot(ra_df, aes(x=Samples, y=Reads, fill=Metric)) +
 
 ```{r complexity}
 metric_df <- complexity_df |> 
-    mutate(condition=samples_df[rownames(complexity_df),]$condition,
+    mutate(condition=samples_df[rownames(complexity_df),,drop=FALSE]$condition,
            lib_orientation=lib_type_df[rownames(complexity_df),,drop=FALSE]$lib_type,
            lib_type=lib_type_df[rownames(complexity_df),,drop=FALSE]$e_type,
            mapping_rate=Assigned/TotalReads*100) |> 
