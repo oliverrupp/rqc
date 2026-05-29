@@ -1,4 +1,13 @@
-library(getopt)
+suppressMessages(library(getopt))
+suppressMessages(library(tidyverse))
+suppressMessages(library(DT))
+suppressMessages(library(plotly))
+suppressMessages(library(heatmaply))
+suppressMessages(library(RColorBrewer))
+suppressMessages(library(GGally))
+suppressMessages(library(jsonlite))
+
+
 
 script_dir <- if (exists("snakemake")) {
   dirname(snakemake@script)

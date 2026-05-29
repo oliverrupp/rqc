@@ -298,6 +298,8 @@ read_mapping <- function() {
                          "Unmapped", "NoFeature", "Assigned",
                          "rRNA")
   
+  lib_type <- c()
+  e_type <- c()
   
   for (sample in sample_info$names) {
     ## FastP
@@ -306,12 +308,13 @@ read_mapping <- function() {
     
     type <- jdat$summary$sequencing
     div <- 1
-    
+    e_type <- c(e_type, type)
+      
     if (regexpr("paired end", type) >= 0) {
       div <- 2
     }
 
-    res_v <- c(jdat$duplication$rate,
+    res_v <- c(jdat$duplication$rate * 100,
                jdat$summary$before_filtering$total_reads / div,
                jdat$filtering_result$low_quality_reads / div,
                jdat$filtering_result$too_many_N_reads / div,
@@ -327,7 +330,9 @@ read_mapping <- function() {
                jdat$num_processed - (jdat$num_decoy_fragments + jdat$num_mapped),
                jdat$num_decoy_fragments, 
                jdat$num_mapped)
-    
+
+    lib_type <- c(lib_type, jdat$library_types[1])
+      
     ## rRNA
     jfile <- paste0("results/salmon_rrna/", sample, "/aux_info/meta_info.json")
     if (file.exists(jfile)) {
@@ -338,7 +343,11 @@ read_mapping <- function() {
     
     results[sample,] <- res_v
   }
-  
+
+  lib_type <- data.frame(lib_type=lib_type, e_type=e_type)
+  rownames(lib_type) = sample_info$names
+  write_tsv(lib_type, "lib_type")
+
   read_mapping_df <<- results
 }
 ##################### READ MAPPING ############################################

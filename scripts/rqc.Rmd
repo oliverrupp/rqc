@@ -36,6 +36,7 @@ g_detect_file    <- paste0(prj_dir, "/tsv/", data_dir, "/gene_detection.tsv")
 g_vst_file       <- paste0(prj_dir, "/tsv/", data_dir, "/g_vst.tsv")
 size_factor_file <- paste0(prj_dir, "/tsv/", data_dir, "/size_factor_qc.tsv")
 dispersion_file  <- paste0(prj_dir, "/tsv/", data_dir, "/g_dispersion.tsv")
+lib_type_file    <- paste0(prj_dir, "/tsv/", data_dir, "/lib_type.tsv")
 
 samples_df       <- read.table(samples_file, row.names = 2, header = T, sep = "\t")
 condition_df     <- read.table(condition_file, row.names = 1, header = T, sep = "\t")
@@ -48,6 +49,7 @@ g_detect_df      <- read.table(g_detect_file, row.names = 1, header = T, sep = "
 g_vst_df         <- read.table(g_vst_file, row.names = 1, header = T, sep = "\t")
 size_factor_df   <- read.table(size_factor_file, row.names = 1, header = T, sep = "\t")
 dispersion_df    <- read.table(dispersion_file, row.names = 1, header = T, sep = "\t")
+lib_type_df      <- read.table(lib_type_file, row.names = 1, header = T, sep = "\t")
 
 sample_names     <- rownames(samples_df)
 
@@ -82,6 +84,8 @@ summary_df <- cbind(summary_df,
 
 
 has_benchmark <- any(file.exists(list.files(benchmark_folder, full.names = TRUE)))
+
+has_batch_factors <- length(batch_cols) > 0
 ```
 
 Summary
@@ -169,16 +173,20 @@ ggplotly(ggplot(ra_df, aes(x=Samples, y=Reads, fill=Metric)) +
 
 ```
 
-### Complexity Metrics
+### Library Metrics
 
 ```{r complexity}
 metric_df <- complexity_df |> 
-   mutate(condition=samples_df$condition) |> 
-    dplyr::select("condition", "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
-         "Duprate", "shannon_entropy")
-   column_names <- c("top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
-         "Duprate", "shannon_entropy")
-datatable(metric_df) |> formatRound(columns = column_names, digits = 2)
+    mutate(condition=samples_df[rownames(complexity_df),]$condition,
+           lib_orientation=lib_type_df[rownames(complexity_df),,drop=FALSE]$lib_type,
+           lib_type=lib_type_df[rownames(complexity_df),,drop=FALSE]$e_type,
+           mapping_rate=Assigned/TotalReads*100) |> 
+    dplyr::select("condition", "lib_type", "lib_orientation", "mapping_rate",
+                  "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
+                  "Duprate", "shannon_entropy")
+column_names <- c("mapping_rate", "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
+                  "Duprate", "shannon_entropy")
+datatable(metric_df, options = list(pageLength = 50)) |> formatRound(columns = column_names, digits = 2)
 ```
 
 ### Gene Detection
@@ -270,6 +278,43 @@ p = ggpairs(
 
 ggplotly(p)
 ```
+
+
+
+```{r batch pca, results='asis', echo=FALSE, eval=has_batch_factors}
+  cat("
+
+### PCA by batch factor
+")
+```
+
+
+
+```{r batch pca plot, eval=has_batch_factors}
+  names <- rownames(pca_data_df)
+  names <- names[names != "__VAR"]
+
+  pc <- pca_data_df[names,]
+  pc <- rownames_to_column(pc, "sample")
+  
+  pcl <- pivot_longer(pc, cols=c(paste0("PC", 1:5)), names_to = "PC", values_to = "rot")
+
+  pcl <- cbind(pcl, samples_df[pcl$sample,])
+
+  pcm <- pivot_longer(pcl, cols = colnames(samples_df))
+
+  compl <- list()
+  for(batch in colnames(samples_df)[!(colnames(samples_df) %in% "condition")]) {
+      batchs <- combn(unique(samples_df[[batch]]), 2, simplify = F)
+      compl <- append(compl, batchs)
+  }
+
+  ggplotly(ggplot(pcm, aes(x = value, y = rot, label=sample)) + geom_boxplot() + geom_jitter(width = 0.2) +
+      facet_grid(PC~name, scale = "free_x") + 
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)))
+```
+
+
 
 ### PCA Outlier
 
@@ -491,7 +536,7 @@ falco_files <- expand.grid(falco_folder,
 sample_names <- gsub("\\.f(ast|)q\\.gz$", "", basename(falco_files))
 falco_data <- setNames(lapply(falco_files, read_falco), sample_names)
 
-has_falco <- length(falco_files)
+has_falco <- length(falco_files) > 0
 ```
 
 ```{r falco1, results='asis', echo=FALSE, eval=has_falco}
