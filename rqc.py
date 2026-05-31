@@ -307,7 +307,13 @@ class RQCPipeline:
         # Add dry run
         if dry_run:
             cmd.append("--dry-run")
-        
+
+
+        # Add rerun incomplete
+        if rerun_incomplete:
+            cmd.append("--rerun-incomplete")
+
+            
         # Add config file (in addition to profile for HPC)
         if config_file:
             cmd.extend(["--configfile", str(config_file)])
@@ -436,6 +442,14 @@ Supported HPC executors:
         help="Perform a dry run without executing jobs"
     )
 
+    # rerun incomplete
+    parser.add_argument(
+        "--rerun-incomplete",
+        action="store_true",
+        help="Rerun incomplete jobs"
+    )
+
+    
     # just validate
     parser.add_argument(
         "--validate",
