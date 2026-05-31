@@ -100,7 +100,6 @@ class RQCValidator:
         genome_file = subproject_path / self.REQUIRED_GENOME_FILE
         annotation_gtf_file = subproject_path / self.REQUIRED_ANNOTATION_GTF_FILE
         annotation_gff3_file = subproject_path / self.REQUIRED_ANNOTATION_GFF3_FILE
-        samples_file = subproject_path / self.REQUIRED_SAMPLES_FILE
         reads_dir = subproject_path / "reads"
         
         if not genome_file.exists():
@@ -113,14 +112,16 @@ class RQCValidator:
                 logger.error(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE} in {subproject_path.name}")
             return False
         
-        if not samples_file.exists():
-            if verbose:
-                logger.error(f"Missing {self.REQUIRED_SAMPLES_FILE} in {subproject_path.name}")
-            return False
-        
         if not reads_dir.exists() or not reads_dir.is_dir():
             if verbose:
                 logger.error(f"Missing reads directory in {subproject_path.name}")
+            return False
+
+        sample_files = self.get_sample_files(subproject_path, verbose)
+        
+        if not sample_files:
+            if verbose:
+                logger.error(f"No valid samples*.tsv files found in {subproject_path.name}/reference")
             return False
         
         # Check for at least one reads file
@@ -129,29 +130,65 @@ class RQCValidator:
             if verbose:
                 logger.error(f"No .fq.gz files found in {subproject_path.name}/reads")
             return False
-        
-        # Validate samples.tsv has required columns
-        if not self._validate_samples_tsv(samples_file):
-            if verbose:
-                logger.error(f"Invalid samples.tsv in {subproject_path.name}")
-            return False
-        
+                
         return True
     
+    def get_sample_names(self, subproject: str) -> List[str]:
+        """Return sample TSV filenames for a subproject."""
+        return sorted(f.name for f in self.get_sample_files(self.project_dir / subproject)
+    )
+
+    def get_sample_files(self, subproject_path: Path, verbose: bool = False) -> List[Path]:
+        """Return all valid samples*.tsv files."""
+        
+        sample_files = sorted((subproject_path / "reference").glob("samples*.tsv"))
+        valid_samples = set()
+        
+        for sample_file in sample_files:
+            if not self._validate_samples_tsv(sample_file, verbose):
+                if verbose:
+                    logger.error(f"Invalid sample file: {sample_file.name}")
+            else:
+                valid_samples.add(sample_file)
+
+        if not valid_samples:
+            logger.error(f"No invalid sample file found")
+
+        return valid_samples
+
+    def get_report_targets(self, subprojects: Optional[List[str]] = None) -> List[str]:
+        """Return report targets for all samples*.tsv files."""
+
+        targets = []
+
+        selected = (
+            subprojects
+            if subprojects is not None
+            else sorted(self.find_subprojects(verbose=False))
+        )
+
+        for subproject in selected:
+            ref_dir = self.project_dir / subproject 
+
+            for sample_file in self.get_sample_files(ref_dir):
+                suffix = sample_file.stem[len("samples"):]
+
+                if suffix:
+                    targets.append(f"{subproject}/report/samples{suffix}.report.html")
+                else:
+                    targets.append(f"{subproject}/report/samples.report.html")
+
+        return targets
 
     def get_subproject_memory_requirements(self) -> dict:
         """Return memory requirements (GB) for all valid subprojects."""
         result = {}
 
         for subproject in sorted(self.find_subprojects(verbose=False)):
-            genome_file = (
-                self.project_dir /
-                subproject /
-                self.REQUIRED_GENOME_FILE
-            )
+            genome_file = (self.project_dir / subproject / self.REQUIRED_GENOME_FILE)
 
             size_gb = genome_file.stat().st_size / (1024**3)
-            required_mem_gb = size_gb * 15
+            required_mem_gb = size_gb * 13
 
             result[subproject] = {
                 "genome_size_gb": size_gb,
@@ -160,13 +197,14 @@ class RQCValidator:
 
         return result
 
-    def _validate_samples_tsv(self, samples_file: Path) -> bool:
+    def _validate_samples_tsv(self, samples_file: Path, verbose: bool = True) -> bool:
         """Validate samples.tsv has at least 'condition' and 'sample' columns."""
         try:
             with open(samples_file, 'r') as f:
                 header = f.readline().strip().split('\t')
                 if 'condition' not in header or 'sample' not in header:
-                    logger.error(f"samples.tsv missing 'condition' or 'sample' column")
+                    if verbose:
+                        logger.error(f"{samples_file.name} missing 'condition' or 'sample' column")
                     return False
             return True
         except Exception as e:
@@ -225,6 +263,7 @@ class RQCPipeline:
         execution_mode: str,
         use_conda: bool,
         max_cpus: int,
+        max_memory: int,
         max_jobs: int,
         dry_run: bool,
         executor: Optional[str] = None,
@@ -237,6 +276,9 @@ class RQCPipeline:
         
         # Add workflow directory
         cmd.extend(["--directory", str(self.project_dir)])
+
+        cmd.extend(["--resources", f"mem_mb={max_memory}"])
+        cmd.extend(["--config", f"max_mem_mb={max_memory}"])
         
         # Add execution mode
         if execution_mode == "hpc":
@@ -266,8 +308,8 @@ class RQCPipeline:
         
         # Add target rule or subprojects
         if subprojects:
-            # Create output targets for specified subprojects
-            targets = [f"{sp}/report/samples.report.html" for sp in subprojects]
+            validator = RQCValidator(self.project_dir)
+            targets = validator.get_report_targets(subprojects)
             cmd.extend(targets)
         else:
             # Default: run report rule
@@ -351,6 +393,14 @@ Supported HPC executors:
         default=8,
         help="Maximum CPUs for local execution (default: 8)"
     )
+
+    # Resource options
+    parser.add_argument(
+        "--max-memory",
+        type=int,
+        default=32000,
+        help="Maximum CPUs for local execution (default: 8)"
+    )
     
     parser.add_argument(
         "--max-jobs",
@@ -416,25 +466,40 @@ def list_subprojects(project_dir: Path) -> int:
     mem_info = validator.get_subproject_memory_requirements()
 
     print(f"\nValid subprojects in {project_dir}:")
-    print("-" * 80)
-    print(f"{'Subproject':30s} {'Genome (GB)':>12s} {'Mem. Req. (GB)':>15s}")
-    print("-" * 80)
+    print("-" * 70)
+    print(
+        f"{'Subproject':20s} "
+        f"{'Genome (GB)':>12s} "
+        f"{'Mem. Req. (GB)':>15s} "
+        f"Sample files"
+    )
+    print("-" * 70)
+
 
     for subproject in sorted(all_subprojects):
         info = mem_info[subproject]
+        sample_files = validator.get_sample_names(subproject)
+
         print(
-            f"{subproject:30s} "
+            f"{subproject:20s} "
             f"{info['genome_size_gb']:12.2f} "
-            f"{info['required_mem_gb']:15.1f}"
+            f"{info['required_mem_gb']:15.1f} "
+            f"{sample_files[0]}"
         )
 
+        for sample_file in sample_files[1:]:
+            print(
+                f"{'':20s} "
+                f"{'':12s} "
+                f"{'':15s} "
+                f"{sample_file}"
+            )
+    
     max_required_mem_gb = max(
         x["required_mem_gb"] for x in mem_info.values()
     )
 
-    print("-" * 80)
-    print(f"Total: {len(all_subprojects)} subproject(s)")
-    print(f"Maximum required memory: {max_required_mem_gb:.1f} GB")
+    print("-" * 70)
 
     return 0
 
@@ -523,6 +588,7 @@ def main():
         execution_mode=execution_mode,
         use_conda=use_conda,
         max_cpus=args.max_cpus,
+        max_memory=args.max_memory,
         max_jobs=args.max_jobs,
         dry_run=args.dry_run,
         executor=args.hpc,
@@ -537,7 +603,8 @@ def main():
 
     if args.validate:
         logger.info(f"validation OK")
-        logger.info(f"{" ".join(cmd)}")
+        print("\nWill execute:")
+        print(f"{" ".join(cmd)}")
         sys.exit(0)
         
     logger.info("Starting pipeline execution...")

@@ -1,9 +1,8 @@
 import os
 from itertools import product
-
+from pathlib import Path
 
 localrules: report, gentrome, gtf, transcripts, quantiles, rrna, rrna_gtf, fai, plant_bam, init_conda, init_salmon, init_fastp, init_gffread, init_samtools, init_R
-
 
 
 (PLANTS, GROUPS, )=glob_wildcards('{plants}/reference/samples{groups}.tsv')
@@ -56,6 +55,20 @@ def get_sample_report_files():
 
 
 
+
+
+
+MAX_MEM_MB = config["max_mem_mb"]
+
+def use_large(wc):
+    genome = Path(f"{wc.plant}/reference/genome.fa")
+
+    required_mb = ( genome.stat().st_size / 1024**3 * 13 * 1024 )
+
+    return required_mb <= MAX_MEM_MB
+
+
+            
 rule report:
     input: lambda wildcards: get_sample_report_files()
 
@@ -90,16 +103,20 @@ rule index_full:
     threads:
         24
     resources:
-        mem_mb=256000,
+        mem_mb=32000,
         runtime=360,
         nodes=1,
         cpus_per_task=24
     conda: "envs/salmon.yaml"
     benchmark: "{plant}/benchmark/index_full.txt"
     shell: """
+           DECOY="--decoys {input.decoys}"
+           if [ ! -s {input.decoys} ] ; then
+              DECOY=""
+           fi
            salmon --no-version-check index -p {threads} \
            -i {wildcards.plant}/results/index/salmon \
-                  -t {input.t}  --decoys {input.decoys} --keepDuplicates && \
+                  -t {input.t} $DECOY --keepDuplicates && \
            touch {output}
            """
 
@@ -136,9 +153,22 @@ rule gentrome:
     output:
         gentrome="{plant}/results/index/salmon/gentrome.fa",
         decoys="{plant}/results/index/salmon/decoys.txt"
+    params:
+        mode=lambda wc: "large" if use_large(wc) else "small"
+    benchmark: "{plant}/benchmark/gentrome.txt"
     shell: """
-           cat {input.transcripts} {input.genome} > {output.gentrome}
-           cut -f 1 {input.fai} > {output.decoys}
+           if [ "{params.mode}" = "large" ] ; then
+                cat {input.transcripts} {input.genome} > {output.gentrome}
+                cut -f 1 {input.fai} > {output.decoys}
+           else
+                cat {input.transcripts} > {output.gentrome}
+                touch {output.decoys}
+                DECOY=$( basename {input.transcripts} )/decoys.fa
+                if [ -e $DECOY ] ; then
+                     cat $DECOY >> {output.gentrome}
+                     grep "^>" $DECOY | sed "s/>//; s/ .*//" > {output.decoys}
+                fi
+           fi
            """
 
 
