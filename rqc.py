@@ -24,14 +24,20 @@ from pathlib import Path
 from typing import List, Optional, Set
 
 
+SALMON_MEMORY_USAGE_FACTOR = 13
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)-8s - %(message)s',
+    datefmt="%Y-%m-%d %H:%M:%S"
 )
 logger = logging.getLogger(__name__)
 
-
+logging.addLevelName( logging.ERROR, "\033[1;31m%-8s\033[1;0m" % logging.getLevelName(logging.ERROR))
+logging.addLevelName( logging.WARNING, "\033[1;31m%-8s\033[1;0m" % logging.getLevelName(logging.WARNING))
+ 
 class RQCValidator:
     """Validates project directory structure and input files."""
     
@@ -71,13 +77,13 @@ class RQCValidator:
                 subproject_path = item
                 if verbose:
                     print("")
-                    logger.info(f"Checking subfolder {subproject_path}")
+                    logger.info(f"Checking \'{subproject_path.name}\'")
                 
                 # Check if it has the required structure
                 if self._validate_subproject(subproject_path, verbose=verbose):
                     subprojects.add(item.name)
                     if verbose:
-                        logger.info(f"OK")
+                        logger.info(f"valid subproject")
         if verbose:
             print("")
         
@@ -104,31 +110,31 @@ class RQCValidator:
         
         if not genome_file.exists():
             if verbose:
-                logger.error(f"Missing {self.REQUIRED_GENOME_FILE} in {subproject_path.name}")
+                logger.error(f"Missing {self.REQUIRED_GENOME_FILE}")
             return False
         
         if not (annotation_gff3_file.exists() or annotation_gtf_file.exists()):
             if verbose:
-                logger.error(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE} in {subproject_path.name}")
+                logger.error(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE}")
             return False
         
         if not reads_dir.exists() or not reads_dir.is_dir():
             if verbose:
-                logger.error(f"Missing reads directory in {subproject_path.name}")
+                logger.error(f"Missing reads directory")
             return False
 
         sample_files = self.get_sample_files(subproject_path, verbose)
         
         if not sample_files:
             if verbose:
-                logger.error(f"No valid samples*.tsv files found in {subproject_path.name}/reference")
+                logger.error(f"No valid samples*.tsv files found")
             return False
         
         # Check for at least one reads file
         reads_files = list(reads_dir.glob("*.fq.gz"))
         if not reads_files:
             if verbose:
-                logger.error(f"No .fq.gz files found in {subproject_path.name}/reads")
+                logger.error(f"No .fq.gz files found")
             return False
                 
         return True
@@ -147,7 +153,7 @@ class RQCValidator:
         for sample_file in sample_files:
             if not self._validate_samples_tsv(sample_file, verbose):
                 if verbose:
-                    logger.error(f"Invalid sample file: {sample_file.name}")
+                    logger.warning(f"Excluding invalid sample file: {sample_file.name}")
             else:
                 valid_samples.add(sample_file)
 
@@ -188,7 +194,7 @@ class RQCValidator:
             genome_file = (self.project_dir / subproject / self.REQUIRED_GENOME_FILE)
 
             size_gb = genome_file.stat().st_size / (1024**3)
-            required_mem_gb = size_gb * 13
+            required_mem_gb = size_gb * SALMON_MEMORY_USAGE_FACTOR
 
             result[subproject] = {
                 "genome_size_gb": size_gb,
