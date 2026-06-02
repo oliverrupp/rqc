@@ -164,35 +164,46 @@ get_counts_from_salmon <- function() {
         t_dds <- DESeqDataSet(t_se, design = ~condition)
         
         g_dds <- estimateSizeFactors(g_dds)
-        g_dds <- estimateDispersions(g_dds)
         t_dds <- estimateSizeFactors(t_dds)
-        t_dds <- estimateDispersions(t_dds)
+
         
-        t_vsd <- vst(t_dds, blind = sum(replicate_counts$number > 1) == 0) # blind = TRUE if no replicates!
+        if(sum(replicate_counts$number > 1) > 0) {
+            g_dds <- estimateDispersions(g_dds)
+            t_dds <- estimateDispersions(t_dds)
+
+            g_dispersion <<- data.frame(
+                mean = mcols(g_dds)$baseMean,
+                geneEst = mcols(g_dds)$dispGeneEst,
+                fit = mcols(g_dds)$dispFit,
+                final = dispersions(g_dds)
+            )
+        
+            t_dispersion <<- data.frame(
+                mean = mcols(t_dds)$baseMean,
+                geneEst = mcols(t_dds)$dispGeneEst,
+                fit = mcols(t_dds)$dispFit,
+                final = dispersions(t_dds)
+            )
+
+            rownames(g_dispersion) <<- rownames(g_dds)
+            rownames(t_dispersion) <<- rownames(t_dds)
+        } else {
+            g_dispersion <<- data.frame(mean = 0, geneEst = 0, fit = 0, final = 0)
+            t_dispersion <<- data.frame(mean = 0, geneEst = 0, fit = 0, final = 0)
+        }
+
+                                        # blind = TRUE if no replicates!
+        t_vsd <- vst(t_dds, blind = sum(replicate_counts$number > 1) == 0) 
         t_vst <<- assay(t_vsd)
-        g_vsd <- vst(g_dds, blind = sum(replicate_counts$number > 1) == 0) # blind = TRUE if no replicates!
+
+                                        # blind = TRUE if no replicates!
+        g_vsd <- vst(g_dds, blind = sum(replicate_counts$number > 1) == 0) 
         g_vst <<- assay(g_vsd)
+
         
         ## TPM
         t_TPM <<- assay(t_dds, "abundance")
         g_TPM <<- assay(g_dds, "abundance")
-        
-        g_dispersion <<- data.frame(
-          mean = mcols(g_dds)$baseMean,
-          geneEst = mcols(g_dds)$dispGeneEst,
-          fit = mcols(g_dds)$dispFit,
-          final = dispersions(g_dds)
-        )
-        
-        t_dispersion <<- data.frame(
-          mean = mcols(t_dds)$baseMean,
-          geneEst = mcols(t_dds)$dispGeneEst,
-          fit = mcols(t_dds)$dispFit,
-          final = dispersions(t_dds)
-        )
-        
-        rownames(g_dispersion) <<- rownames(g_dds)
-        rownames(t_dispersion) <<- rownames(t_dds)
     })
 #### DESeq2 ####
 
