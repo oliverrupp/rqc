@@ -64,8 +64,8 @@ prj_message <- function(msg, lvl) {
 read_sample_info <- function() {
     prj_message("SAMPLES", 3)
 
-    sample_info <<- read.table(samples_file, header = TRUE, sep = "\t", row.names = 2)
-
+    sample_info <<- read.table(samples_file, header = TRUE, sep = "\t") |> column_to_rownames("sample")
+    
     sname <- mixedsort(unique(sample_info$condition))
     
     sample_info$files <<- paste0("results/salmon/", rownames(sample_info), "/quant.sf")
@@ -117,9 +117,8 @@ get_counts_from_salmon <- function() {
         g_count_matrix <<- assay(g_se, "counts")
 
         check <- unlock(mtx)
-#### tximeta ####
     })
-        
+#### tximeta ####
         
         
 ##### edgeR #####
@@ -152,9 +151,8 @@ get_counts_from_salmon <- function() {
         
         t_geTMM <<- cpm(t_norm_edger)
         g_geTMM <<- cpm(g_norm_edger)
-####### edgeR ######
     })
-        
+####### edgeR ######
         
 #### DESeq2 ####
     prj_message("DESeq2", 4)
@@ -195,9 +193,8 @@ get_counts_from_salmon <- function() {
         
         rownames(g_dispersion) <<- rownames(g_dds)
         rownames(t_dispersion) <<- rownames(t_dds)
-#### DESeq2 ####
     })
-        
+#### DESeq2 ####
 
 ####n correlation ####
     g_sample_correlation <- cor(g_vst, method = "pearson", use = "pairwise.complete.obs")

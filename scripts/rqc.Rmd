@@ -38,7 +38,7 @@ size_factor_file <- paste0(prj_dir, "/tsv/", data_dir, "/size_factor_qc.tsv")
 dispersion_file  <- paste0(prj_dir, "/tsv/", data_dir, "/g_dispersion.tsv")
 lib_type_file    <- paste0(prj_dir, "/tsv/", data_dir, "/lib_type.tsv")
 
-samples_df       <- read.table(samples_file, row.names = 2, header = T, sep = "\t")
+samples_df       <- read.table(samples_file, header = T, sep = "\t") |> column_to_rownames("sample")
 condition_df     <- read.table(condition_file, row.names = 1, header = T, sep = "\t")
 complexity_df    <- read.table(complexity_file, row.names = 1, header = T, sep = "\t")
 degradation_df   <- read.table(degradation_file, row.names = 1, header = T, sep = "\t")

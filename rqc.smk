@@ -235,7 +235,6 @@ rule rrna_gtf:
 
 
 
-#TODO: move minimal length to config.yaml
 rule trim_pe:
     input:
         r1="{plant}/reads/{sample}_1.fq.gz",
@@ -249,13 +248,14 @@ rule trim_pe:
     threads:
         8
     conda: "envs/fastp.yaml"
+    params: min_length = config.get("mininal_read_length", 30)
     benchmark: "{plant}/benchmark/trim_pe.{sample}.txt"
     shell: """
            fastp -i {input.r1} -I {input.r2} \
                  -o {output.r1pe} -O {output.r2pe} \
                  --unpaired1 {output.r1se} --unpaired2 {output.r2se} \
                  --thread {threads} \
-                 -j {output.json} -l 50 -h /dev/null
+                 -j {output.json} -l {params.min_length} -h /dev/null
            """
 
 
@@ -269,12 +269,13 @@ rule trim_se:
     threads:
         8
     conda: "envs/fastp.yaml"
+    params: min_length = config.get("mininal_read_length", 30)
     benchmark: "{plant}/benchmark/trim_se.{sample}.txt"
     shell: """
            fastp -i {input.rs}  \
                  -o {output.rse}  \
                  --thread {threads} \
-                 -j {output.json} -l 50 -h /dev/null
+                 -j {output.json} -l {params.min_length} -h /dev/null
            """
 
 
