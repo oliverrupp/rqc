@@ -17,6 +17,9 @@ suppressMessages(library(RColorBrewer))
 suppressMessages(library(GGally))
 
 
+
+
+
 ##################### INIT ####################################################
 init_project <- function() {
   message(" == INIT")
@@ -56,6 +59,7 @@ prj_message <- function(msg, lvl) {
 
 
 
+
 ##################### SAMPLES #################################################
 read_sample_info <- function() {
     prj_message("SAMPLES", 3)
@@ -74,6 +78,7 @@ read_sample_info <- function() {
     prj_message(paste0(length(unique(sample_info$condition)), " conditions"), 4)
 }
 ##################### SAMPLES #################################################
+
 
 
 
@@ -211,6 +216,7 @@ get_counts_from_salmon <- function() {
 
 
 
+
 ##################### TOP GENES ###############################################
 compute_gene_detection <- function() {
     prj_message("TOP GENE READS", 3)
@@ -225,6 +231,7 @@ compute_gene_detection <- function() {
                             rename_with(~ paste0("top_", .x, "_transcripts"))
 }
 ##################### TOP GENES ###############################################
+
 
 
 
@@ -245,7 +252,8 @@ library_complexity <- function() {
 
 
 
-##################### Saturation ##############################################
+
+##################### SATURATION ##############################################
 get_saturation <- function() {
   prj_message("SATURATION", 3)
 
@@ -282,7 +290,8 @@ get_saturation <- function() {
       saturation_auc = trapz(fraction, detected)
     ) |> column_to_rownames("sample")
 }
-##################### Saturation ##############################################
+##################### SATURATION ##############################################
+
 
 
 
@@ -355,6 +364,7 @@ read_mapping <- function() {
 
 
 
+
 ##################### 5'/3' BIAS ##############################################
 get_coverage_bias <- function() {
   prj_message("5'/3' BIAS", 3)
@@ -406,6 +416,9 @@ get_coverage_bias <- function() {
 
 
 
+
+
+##################### PCA OUTLIER  ############################################
 pca_outlier_global <- function() {
   prj_message("PCA", 3)
 
@@ -482,7 +495,10 @@ pca_outlier_global <- function() {
 ##################### PCA OUTLIER ##############################################
 
 
-##################### CONDITION PCA  ###########################################
+
+
+
+##################### CONDITION PCA ############################################
 condition_pca <- function() {
   prj_message("CONDITION PCA", 3)
   
@@ -517,8 +533,10 @@ condition_pca <- function() {
   
   write_tsv(condition_pca_df, "condition_df")
 }
+##################### CONDITION PCA ############################################
 
-##################### CONDITION PCA  ###########################################
+
+
 
 
 ##################### CHECK FACTORS ###########################################
@@ -553,6 +571,7 @@ size_factor_qc <- function() {
 
 
 
+
 ##################### WRITE TSV RESULTS #######################################
 write_tsv <- function(df, file) {
     dir <- paste0("tsv/", outdir)
@@ -570,7 +589,8 @@ write_tsv <- function(df, file) {
 
 
 
-##################### render HTML #######################################
+
+##################### RENDER HTML #############################################
 render_html <- function() {
     prj_message("RENDER HTML", 3)
 
@@ -598,26 +618,26 @@ render_html <- function() {
                    output_file = html_report_file)
 
 }
-##################### render HTML #######################################
+##################### RENDER HTML #############################################
 
 
+
+
+##################### RUN ANALYSES ############################################
 if(0) {
   setwd("~/Projects/trqc/art")
   setwd("~/Projects/trqc/CS")
   setwd("~/Projects/trqc/PP")
 }
 
-
 ### init paths ####
 init_project()
 ### init paths ####
-
 
 ### read results ####
 read_sample_info()
 get_counts_from_salmon()
 ### read results ####
-
 
 ### complexity ####
 compute_gene_detection()
@@ -630,17 +650,14 @@ complexity_df <<- cbind(read_mapping_df, top_x_transcripts, shannon_entropy)
 write_tsv(complexity_df, "complexity")
 ### complexity ####
 
-
 ### degradation ####
 get_coverage_bias()
 ### degradation ####
-
 
 ### pca outlier ####
 pca_outlier_global()
 condition_pca()
 ### pca outlier ####
-
 
 ### size factor ####
 size_factor_qc()
@@ -649,7 +666,6 @@ size_factor_qc()
 ### render HTML ####
 render_html()
 ### render HTML ####
-
 
 prj_message("DONE", 2)
 

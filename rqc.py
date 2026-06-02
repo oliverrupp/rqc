@@ -11,7 +11,7 @@ Usage:
 Example:
     rqc.py --no-conda --max-cpus 16
     rqc.py --hpc slurm --max-jobs 10 --hpc-config hpc_config.yaml
-    rqc.py --list-subprojects
+    rqc.py --list-organisms
     rqc.py /path/to/project -no-conda
 """
 
@@ -68,45 +68,45 @@ class RQCValidator:
         return True
 
     
-    def find_subprojects(self, verbose: bool = True) -> Set[str]:
-        """Find all valid subproject directories."""
-        subprojects = set()
+    def find_organisms(self, verbose: bool = True) -> Set[str]:
+        """Find all valid organism directories."""
+        organisms = set()
         
         for item in self.project_dir.iterdir():
             if item.is_dir() and not item.name.startswith('.'):
-                subproject_path = item
+                organism_path = item
                 if verbose:
                     print("")
-                    logger.info(f"Checking \'{subproject_path.name}\'")
+                    logger.info(f"Checking \'{organism_path.name}\'")
                 
                 # Check if it has the required structure
-                if self._validate_subproject(subproject_path, verbose=verbose):
-                    subprojects.add(item.name)
+                if self._validate_organism(organism_path, verbose=verbose):
+                    organisms.add(item.name)
                     if verbose:
-                        logger.info(f"valid subproject")
+                        logger.info(f"valid organism")
         if verbose:
             print("")
         
-        if not subprojects:
+        if not organisms:
             if verbose:
-                logger.error(f"No valid subprojects found in {self.project_dir}")
-                logger.error(f"Subprojects must contain: {self.REQUIRED_GENOME_FILE}, "
+                logger.error(f"No valid organisms found in {self.project_dir}")
+                logger.error(f"Organisms must contain: {self.REQUIRED_GENOME_FILE}, "
                              f"{self.REQUIRED_ANNOTATION_GFF3_FILE} or {self.REQUIRED_ANNOTATION_GFF3_FILE}, {self.REQUIRED_SAMPLES_FILE}, "
                              f"and reads files")
             return set()
 
         if verbose:
-            logger.info(f"Found {len(subprojects)} valid subproject(s): {sorted(subprojects)}")
+            logger.info(f"Found {len(organisms)} valid organism(s): {sorted(organisms)}")
             
-        return subprojects
+        return organisms
     
-    def _validate_subproject(self, subproject_path: Path, verbose: bool = True) -> bool:
-        """Validate a single subproject has required files."""
+    def _validate_organism(self, organism_path: Path, verbose: bool = True) -> bool:
+        """Validate a single organism has required files."""
         # Check required reference files
-        genome_file = subproject_path / self.REQUIRED_GENOME_FILE
-        annotation_gtf_file = subproject_path / self.REQUIRED_ANNOTATION_GTF_FILE
-        annotation_gff3_file = subproject_path / self.REQUIRED_ANNOTATION_GFF3_FILE
-        reads_dir = subproject_path / "reads"
+        genome_file = organism_path / self.REQUIRED_GENOME_FILE
+        annotation_gtf_file = organism_path / self.REQUIRED_ANNOTATION_GTF_FILE
+        annotation_gff3_file = organism_path / self.REQUIRED_ANNOTATION_GFF3_FILE
+        reads_dir = organism_path / "reads"
         
         if not genome_file.exists():
             if verbose:
@@ -123,7 +123,7 @@ class RQCValidator:
                 logger.error(f"Missing reads directory")
             return False
 
-        sample_files = self.get_sample_files(subproject_path, verbose)
+        sample_files = self.get_sample_files(organism_path, verbose)
         
         if not sample_files:
             if verbose:
@@ -139,15 +139,15 @@ class RQCValidator:
                 
         return True
     
-    def get_sample_names(self, subproject: str) -> List[str]:
-        """Return sample TSV filenames for a subproject."""
-        return sorted(f.name for f in self.get_sample_files(self.project_dir / subproject)
+    def get_sample_names(self, organism: str) -> List[str]:
+        """Return sample TSV filenames for a organism."""
+        return sorted(f.name for f in self.get_sample_files(self.project_dir / organism)
     )
 
-    def get_sample_files(self, subproject_path: Path, verbose: bool = False) -> List[Path]:
+    def get_sample_files(self, organism_path: Path, verbose: bool = False) -> List[Path]:
         """Return all valid samples*.tsv files."""
         
-        sample_files = sorted((subproject_path / "reference").glob("samples*.tsv"))
+        sample_files = sorted((organism_path / "reference").glob("samples*.tsv"))
         valid_samples = set()
         
         for sample_file in sample_files:
@@ -162,41 +162,41 @@ class RQCValidator:
 
         return valid_samples
 
-    def get_report_targets(self, subprojects: Optional[List[str]] = None) -> List[str]:
+    def get_report_targets(self, organisms: Optional[List[str]] = None) -> List[str]:
         """Return report targets for all samples*.tsv files."""
 
         targets = []
 
         selected = (
-            subprojects
-            if subprojects is not None
-            else sorted(self.find_subprojects(verbose=False))
+            organisms
+            if organisms is not None
+            else sorted(self.find_organisms(verbose=False))
         )
 
-        for subproject in selected:
-            ref_dir = self.project_dir / subproject 
+        for organism in selected:
+            ref_dir = self.project_dir / organism 
 
             for sample_file in self.get_sample_files(ref_dir):
                 suffix = sample_file.stem[len("samples"):]
 
                 if suffix:
-                    targets.append(f"{subproject}/report/samples{suffix}.report.html")
+                    targets.append(f"{organism}/report/samples{suffix}.report.html")
                 else:
-                    targets.append(f"{subproject}/report/samples.report.html")
+                    targets.append(f"{organism}/report/samples.report.html")
 
         return targets
 
-    def get_subproject_memory_requirements(self) -> dict:
-        """Return memory requirements (GB) for all valid subprojects."""
+    def get_organism_memory_requirements(self) -> dict:
+        """Return memory requirements (GB) for all valid organisms."""
         result = {}
 
-        for subproject in sorted(self.find_subprojects(verbose=False)):
-            genome_file = (self.project_dir / subproject / self.REQUIRED_GENOME_FILE)
+        for organism in sorted(self.find_organisms(verbose=False)):
+            genome_file = (self.project_dir / organism / self.REQUIRED_GENOME_FILE)
 
             size_gb = genome_file.stat().st_size / (1024**3)
             required_mem_gb = size_gb * SALMON_MEMORY_USAGE_FACTOR
 
-            result[subproject] = {
+            result[organism] = {
                 "genome_size_gb": size_gb,
                 "required_mem_gb": required_mem_gb
             }
@@ -275,7 +275,7 @@ class RQCPipeline:
         rerun_incomplete: bool,
         executor: Optional[str] = None,
         hpc_config: Optional[Path] = None,
-        subprojects: Optional[List[str]] = None,
+        organisms: Optional[List[str]] = None,
         config_file: Optional[Path] = None
     ) -> List[str]:
         """Build the Snakemake command with all options (Snakemake 9 compatible)."""
@@ -319,10 +319,10 @@ class RQCPipeline:
         if config_file:
             cmd.extend(["--configfile", str(config_file)])
         
-        # Add target rule or subprojects
-        if subprojects:
+        # Add target rule or organisms
+        if organisms:
             validator = RQCValidator(self.project_dir)
-            targets = validator.get_report_targets(subprojects)
+            targets = validator.get_report_targets(organisms)
             cmd.extend(targets)
         else:
             # Default: run report rule
@@ -355,8 +355,8 @@ Examples:
   rqc.py --no-conda --max-cpus 16
   rqc.py --hpc slurm --max-jobs 100
   rqc.py --hpc slurm --max-jobs 100 --hpc-config profile.yaml
-  rqc.py --hpc lsf --max-jobs 50 --subproject subproj1,subproj2
-  rqc.py --list-subprojects
+  rqc.py --hpc lsf --max-jobs 50 --organism subproj1,subproj2
+  rqc.py --list-organisms
   rqc.py --dry-run
   rqc.py --validate
   rqc.py /path/to/project 
@@ -377,11 +377,11 @@ Supported HPC executors:
         help="Project directory (default: current working directory)"
     )
     
-    # List subprojects option
+    # List organisms option
     parser.add_argument(
-        "--list-subprojects",
+        "--list-organisms",
         action="store_true",
-        help="List all valid subprojects and exit"
+        help="List all valid organisms and exit"
     )
     
     # HPC execution (optional - defaults to local if not specified)
@@ -429,11 +429,11 @@ Supported HPC executors:
         help="Snakemake HPC profile/config file (YAML format)"
     )
     
-    # Subprojects
+    # Organisms
     parser.add_argument(
-        "--subproject",
+        "--organism",
         type=str,
-        help="Comma-separated list of subprojects to run (default: all)"
+        help="Comma-separated list of organisms to run (default: all)"
     )
     
     # Dry run
@@ -470,26 +470,26 @@ Supported HPC executors:
     return parser.parse_args()
 
 
-def list_subprojects(project_dir: Path) -> int:
-    """List all valid subprojects in the project directory."""
+def list_organisms(project_dir: Path) -> int:
+    """List all valid organisms in the project directory."""
     validator = RQCValidator(project_dir)
 
     if not validator.validate_project_structure():
         logger.error("Project structure validation failed")
         return 1
 
-    all_subprojects = validator.find_subprojects()
+    all_organisms = validator.find_organisms()
 
-    if not all_subprojects:
-        logger.error("No valid subprojects found")
+    if not all_organisms:
+        logger.error("No valid organisms found")
         return 1
 
-    mem_info = validator.get_subproject_memory_requirements()
+    mem_info = validator.get_organism_memory_requirements()
 
-    print(f"\nValid subprojects in {project_dir}:")
+    print(f"\nValid organisms in {project_dir}:")
     print("-" * 70)
     print(
-        f"{'Subproject':20s} "
+        f"{'Organism':20s} "
         f"{'Genome (GB)':>12s} "
         f"{'Mem. Req. (GB)':>15s} "
         f"Sample files"
@@ -497,12 +497,12 @@ def list_subprojects(project_dir: Path) -> int:
     print("-" * 70)
 
 
-    for subproject in sorted(all_subprojects):
-        info = mem_info[subproject]
-        sample_files = validator.get_sample_names(subproject)
+    for organism in sorted(all_organisms):
+        info = mem_info[organism]
+        sample_files = validator.get_sample_names(organism)
 
         print(
-            f"{subproject:20s} "
+            f"{organism:20s} "
             f"{info['genome_size_gb']:12.2f} "
             f"{info['required_mem_gb']:15.1f} "
             f"{sample_files[0]}"
@@ -535,9 +535,9 @@ def main():
     # Determine project directory (use current working directory if not specified)
     project_dir = Path(args.project_dir) if args.project_dir else Path.cwd()
     
-    # Handle list-subprojects option
-    if args.list_subprojects:
-        return list_subprojects(project_dir)
+    # Handle list-organisms option
+    if args.list_organisms:
+        return list_organisms(project_dir)
     
     # Determine execution mode (defaults to local if --hpc not specified)
     execution_mode = "hpc" if args.hpc else "local"
@@ -556,27 +556,27 @@ def main():
         logger.error("Project structure validation failed")
         sys.exit(1)
     
-    # Find and filter subprojects
-    all_subprojects = validator.find_subprojects()
-    if not all_subprojects:
-        logger.error("No valid subprojects found")
+    # Find and filter organisms
+    all_organisms = validator.find_organisms()
+    if not all_organisms:
+        logger.error("No valid organisms found")
         sys.exit(1)
     
-    # Parse subproject filter if provided
-    selected_subprojects = None
-    if args.subproject:
-        selected_subprojects = [sp.strip() for sp in args.subproject.split(",")]
+    # Parse organism filter if provided
+    selected_organisms = None
+    if args.organism:
+        selected_organisms = [sp.strip() for sp in args.organism.split(",")]
         
-        # Validate requested subprojects exist
-        invalid = set(selected_subprojects) - all_subprojects
+        # Validate requested organisms exist
+        invalid = set(selected_organisms) - all_organisms
         if invalid:
-            logger.error(f"Invalid subproject(s): {', '.join(invalid)}")
-            logger.error(f"Available subprojects: {', '.join(sorted(all_subprojects))}")
+            logger.error(f"Invalid organism(s): {', '.join(invalid)}")
+            logger.error(f"Available organisms: {', '.join(sorted(all_organisms))}")
             sys.exit(1)
         
-        logger.info(f"Running selected subprojects: {', '.join(selected_subprojects)}")
+        logger.info(f"Running selected organisms: {', '.join(selected_organisms)}")
     else:
-        logger.info(f"Running all subprojects: {', '.join(sorted(all_subprojects))}")
+        logger.info(f"Running all organisms: {', '.join(sorted(all_organisms))}")
     
     # Validate config file if provided
     if args.config:
@@ -615,7 +615,7 @@ def main():
         rerun_incomplete=args.rerun_incomplete,
         executor=args.hpc,
         hpc_config=args.hpc_config,
-        subprojects=selected_subprojects,
+        organisms=selected_organisms,
         config_file=args.config
     )
     
