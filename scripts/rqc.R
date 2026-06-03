@@ -22,31 +22,31 @@ suppressMessages(library(GGally))
 
 ##################### INIT ####################################################
 init_project <- function() {
-  message(" == INIT")
+    message(" == INIT")
 
-  spec <- matrix(c(
-    "datafolder", "d", 1, "character",
-    "samples", "s", 1, "character",
-    "help", "h", 0, "logical"
-  ), byrow = TRUE, ncol = 4)
-  opt <- getopt(spec)
+    spec <- matrix(c(
+        "datafolder", "d", 1, "character",
+        "samples", "s", 1, "character",
+        "help", "h", 0, "logical"
+    ), byrow = TRUE, ncol = 4)
+    opt <- getopt(spec)
 
-  samples_file <<- NULL
+    samples_file <<- NULL
 
-  if (exists("snakemake")) {
-      samples_file <<- normalizePath(snakemake@input[["samples"]], mustWork = TRUE)
-      setwd(dirname(snakemake@output[["report"]]))
-      setwd(dirname(getwd()))
-  } else {
-      if (!is.null(opt$samples)) samples_file <<- normalizePath(opt$samples, mustWork = TRUE)
-      if (!is.null(opt$datafolder)) setwd(opt$datafolder)
-  }
+    if (exists("snakemake")) {
+        samples_file <<- normalizePath(snakemake@input[["samples"]], mustWork = TRUE)
+        setwd(dirname(snakemake@output[["report"]]))
+        setwd(dirname(getwd()))
+    } else {
+        if (!is.null(opt$samples)) samples_file <<- normalizePath(opt$samples, mustWork = TRUE)
+        if (!is.null(opt$datafolder)) setwd(opt$datafolder)
+    }
 
-  if(is.null(samples_file)) samples_file <<- normalizePath("reference/samples.tsv", mustWork = TRUE)
+    if(is.null(samples_file)) samples_file <<- normalizePath("reference/samples.tsv", mustWork = TRUE)
 
-  project_name <<- basename(getwd())
+    project_name <<- basename(getwd())
 
-  outdir <<- gsub(".tsv", "", basename(samples_file))
+    outdir <<- gsub(".tsv", "", basename(samples_file))
 }
 
 prj_message <- function(msg, lvl) {
@@ -119,8 +119,8 @@ get_counts_from_salmon <- function() {
         check <- unlock(mtx)
     })
 #### tximeta ####
-        
-        
+    
+    
 ##### edgeR #####
     prj_message("edgeR", 4)
     suppressMessages({
@@ -153,7 +153,7 @@ get_counts_from_salmon <- function() {
         g_geTMM <<- cpm(g_norm_edger)
     })
 ####### edgeR ######
-        
+    
 #### DESeq2 ####
     prj_message("DESeq2", 4)
     suppressMessages({
@@ -177,7 +177,7 @@ get_counts_from_salmon <- function() {
                 fit = mcols(g_dds)$dispFit,
                 final = dispersions(g_dds)
             )
-        
+            
             t_dispersion <<- data.frame(
                 mean = mcols(t_dds)$baseMean,
                 geneEst = mcols(t_dds)$dispGeneEst,
@@ -213,10 +213,10 @@ get_counts_from_salmon <- function() {
 #### correlation ####
 
     for(cnts in c("count_matrix", "TPM", "TMM", "geTMM", "vst", "dispersion")) {
-      for(ref in c("t", "g")) {
-        v <- paste0(ref, "_", cnts)
-        write_tsv(get(v), v)
-      }
+        for(ref in c("t", "g")) {
+            v <- paste0(ref, "_", cnts)
+            write_tsv(get(v), v)
+        }
     }
 }
 ##################### COLLECT COUNTS ##########################################
@@ -236,7 +236,7 @@ compute_gene_detection <- function() {
     
     top_x_transcripts <<- t(read_fraction_cumsum[c(10, 50, 100),] |> 
                             dplyr::select(-transcripts) * 100) |> as.data.frame() |>
-                            rename_with(~ paste0("top_", .x, "_transcripts"))
+        rename_with(~ paste0("top_", .x, "_transcripts"))
 }
 ##################### TOP GENES ###############################################
 
@@ -246,14 +246,14 @@ compute_gene_detection <- function() {
 
 ##################### LIB COMPLEXITY ##########################################
 library_complexity <- function() {
-  prj_message("LIB COMPLEXITY", 3)
-  
-  shannon_entropy <<- apply(t_count_matrix, 2, function(x) {
-    p <- x / sum(x)
-    p <- p[p > 0]
+    prj_message("LIB COMPLEXITY", 3)
     
-    -sum(p * log(p))
-  })
+    shannon_entropy <<- apply(t_count_matrix, 2, function(x) {
+        p <- x / sum(x)
+        p <- p[p > 0]
+        
+        -sum(p * log(p))
+    })
 }
 ##################### LIB COMPLEXITY ##########################################
 
@@ -263,40 +263,40 @@ library_complexity <- function() {
 
 ##################### SATURATION ##############################################
 get_saturation <- function() {
-  prj_message("SATURATION", 3)
+    prj_message("SATURATION", 3)
 
-  fractions <- seq(0.05, 1, by=0.05)
+    fractions <- seq(0.05, 1, by=0.05)
 
-  results <- list()
+    results <- list()
 
-  for(sample in colnames(t_count_matrix)) {
-    x <- t_count_matrix[,sample]
-  
-    max_detected <- sum(x >= 10)
-    
-    for(frac in fractions) {
-      subsampled <- rbinom(
-        length(x),
-        size = round(x),
-        prob = frac
-      )
-    
-      detected <- sum(subsampled >= 10)
-    
-      results[[length(results)+1]] <- data.frame(
-        sample = sample,
-        fraction = frac,
-        detected = detected / max_detected
-      )
+    for(sample in colnames(t_count_matrix)) {
+        x <- t_count_matrix[,sample]
+        
+        max_detected <- sum(x >= 10)
+        
+        for(frac in fractions) {
+            subsampled <- rbinom(
+                length(x),
+                size = round(x),
+                prob = frac
+            )
+            
+            detected <- sum(subsampled >= 10)
+            
+            results[[length(results)+1]] <- data.frame(
+                sample = sample,
+                fraction = frac,
+                detected = detected / max_detected
+            )
+        }
     }
-  }
 
-  saturation_auc_df <<- do.call(rbind, results) |>
-    group_by(sample) |> 
-    arrange(fraction, .by_group = TRUE) |>
-    summarise(
-      saturation_auc = trapz(fraction, detected)
-    ) |> column_to_rownames("sample")
+    saturation_auc_df <<- do.call(rbind, results) |>
+        group_by(sample) |> 
+        arrange(fraction, .by_group = TRUE) |>
+        summarise(
+            saturation_auc = trapz(fraction, detected)
+        ) |> column_to_rownames("sample")
 }
 ##################### SATURATION ##############################################
 
@@ -306,66 +306,66 @@ get_saturation <- function() {
 
 ##################### READ MAPPING ############################################
 read_mapping <- function() {
-  prj_message("READ MAPPING", 3)
-  
-  
-  results <- data.frame(matrix(ncol = 10, nrow = 0))
-  colnames(results) <- c("Duprate", "TotalReads", 
-                         "LowQuality", "Nreads", "TooShort", "TooLong", 
-                         "Unmapped", "NoFeature", "Assigned",
-                         "rRNA")
-  
-  lib_type <- c()
-  e_type <- c()
-  
-  for (sample in sample_info$names) {
-    ## FastP
-    jfile <- paste0("results/trimmed/", sample, ".json")
-    jdat <- fromJSON(jfile)
+    prj_message("READ MAPPING", 3)
     
-    type <- jdat$summary$sequencing
-    div <- 1
-    e_type <- c(e_type, type)
-      
-    if (regexpr("paired end", type) >= 0) {
-      div <- 2
+    
+    results <- data.frame(matrix(ncol = 10, nrow = 0))
+    colnames(results) <- c("Duprate", "TotalReads", 
+                           "LowQuality", "Nreads", "TooShort", "TooLong", 
+                           "Unmapped", "NoFeature", "Assigned",
+                           "rRNA")
+    
+    lib_type <- c()
+    e_type <- c()
+    
+    for (sample in sample_info$names) {
+        ## FastP
+        jfile <- paste0("results/trimmed/", sample, ".json")
+        jdat <- fromJSON(jfile)
+        
+        type <- jdat$summary$sequencing
+        div <- 1
+        e_type <- c(e_type, type)
+        
+        if (regexpr("paired end", type) >= 0) {
+            div <- 2
+        }
+
+        res_v <- c(jdat$duplication$rate * 100,
+                   jdat$summary$before_filtering$total_reads / div,
+                   jdat$filtering_result$low_quality_reads / div,
+                   jdat$filtering_result$too_many_N_reads / div,
+                   jdat$filtering_result$too_short_reads / div,
+                   jdat$filtering_result$too_long_reads / div)
+        
+        
+        ## Salmon
+        jfile <- paste0("results/salmon/", sample, "/aux_info/meta_info.json")
+        jdat <- fromJSON(jfile)
+        
+        res_v <- c(res_v, 
+                   jdat$num_processed - (jdat$num_decoy_fragments + jdat$num_mapped),
+                   jdat$num_decoy_fragments, 
+                   jdat$num_mapped)
+
+        lib_type <- c(lib_type, jdat$library_types[1])
+        
+        ## rRNA
+        jfile <- paste0("results/salmon_rrna/", sample, "/aux_info/meta_info.json")
+        if (file.exists(jfile)) {
+            jdat <- fromJSON(jfile)
+            
+            res_v <- c(res_v, jdat$num_mapped)
+        } else { res_v <- c(res_v, -1) }
+        
+        results[sample,] <- res_v
     }
 
-    res_v <- c(jdat$duplication$rate * 100,
-               jdat$summary$before_filtering$total_reads / div,
-               jdat$filtering_result$low_quality_reads / div,
-               jdat$filtering_result$too_many_N_reads / div,
-               jdat$filtering_result$too_short_reads / div,
-               jdat$filtering_result$too_long_reads / div)
-    
-    
-    ## Salmon
-    jfile <- paste0("results/salmon/", sample, "/aux_info/meta_info.json")
-    jdat <- fromJSON(jfile)
-    
-    res_v <- c(res_v, 
-               jdat$num_processed - (jdat$num_decoy_fragments + jdat$num_mapped),
-               jdat$num_decoy_fragments, 
-               jdat$num_mapped)
+    lib_type <- data.frame(lib_type=lib_type, e_type=e_type)
+    rownames(lib_type) = sample_info$names
+    write_tsv(lib_type, "lib_type")
 
-    lib_type <- c(lib_type, jdat$library_types[1])
-      
-    ## rRNA
-    jfile <- paste0("results/salmon_rrna/", sample, "/aux_info/meta_info.json")
-    if (file.exists(jfile)) {
-      jdat <- fromJSON(jfile)
-      
-      res_v <- c(res_v, jdat$num_mapped)
-    } else { res_v <- c(res_v, -1) }
-    
-    results[sample,] <- res_v
-  }
-
-  lib_type <- data.frame(lib_type=lib_type, e_type=e_type)
-  rownames(lib_type) = sample_info$names
-  write_tsv(lib_type, "lib_type")
-
-  read_mapping_df <<- results
+    read_mapping_df <<- results
 }
 ##################### READ MAPPING ############################################
 
@@ -375,50 +375,50 @@ read_mapping <- function() {
 
 ##################### 5'/3' BIAS ##############################################
 get_coverage_bias <- function() {
-  prj_message("5'/3' BIAS", 3)
-  
-  deg_res <- data.frame(matrix(ncol = 10, nrow = 0))
-  colnames(deg_res) <- paste0("q", 1:10)
-  
-  lapply(sample_info$names, function(sample) {
-    jfile <- file.path("results/salmon_quantiles", sample, "quant.sf")
+    prj_message("5'/3' BIAS", 3)
     
-    if (!file.exists(jfile)) { return(NULL) }
+    deg_res <- data.frame(matrix(ncol = 10, nrow = 0))
+    colnames(deg_res) <- paste0("q", 1:10)
     
-    dc <- read_tsv(jfile, show_col_types = FALSE) |>
-        dplyr::select(Name, NumReads) |>
-        mutate(ids      = str_remove(Name, "_q[0-9]+$"),
-               quantile = str_extract(Name, "q[0-9]+$"))
-    
-    dcd <- dc |> pivot_wider(id_cols = ids, names_from = quantile, values_from = NumReads) |> 
-      column_to_rownames("ids")
-    
-    dcd[is.na(dcd)] <- 0
-    dcd <- dcd[rowSums(dcd) >= 100,]
-    
-    mat <- as.matrix(dcd)
-    rs <- rowSums(mat)
-    mat <- mat / rs * 100
-    
-    pct <- colSums(mat)
-    pct <- pct / sum(pct) * 100
-    
-    deg_res[sample, ] <<- pct[colnames(deg_res)]
-  })
+    lapply(sample_info$names, function(sample) {
+        jfile <- file.path("results/salmon_quantiles", sample, "quant.sf")
+        
+        if (!file.exists(jfile)) { return(NULL) }
+        
+        dc <- read_tsv(jfile, show_col_types = FALSE) |>
+            dplyr::select(Name, NumReads) |>
+            mutate(ids      = str_remove(Name, "_q[0-9]+$"),
+                   quantile = str_extract(Name, "q[0-9]+$"))
+        
+        dcd <- dc |> pivot_wider(id_cols = ids, names_from = quantile, values_from = NumReads) |> 
+            column_to_rownames("ids")
+        
+        dcd[is.na(dcd)] <- 0
+        dcd <- dcd[rowSums(dcd) >= 100,]
+        
+        mat <- as.matrix(dcd)
+        rs <- rowSums(mat)
+        mat <- mat / rs * 100
+        
+        pct <- colSums(mat)
+        pct <- pct / sum(pct) * 100
+        
+        deg_res[sample, ] <<- pct[colnames(deg_res)]
+    })
 
-  write_tsv(deg_res, "gene_body_coverage")
-  
-  
-  cov_bias_skewness <- apply(deg_res, 1, function(data) {
-    mx <- max(data[2:9])
-    mi <- min(data[2:9])
-    px <- which(data == mx)
-    pi <- which(data == mi)
+    write_tsv(deg_res, "gene_body_coverage")
+    
+    
+    cov_bias_skewness <- apply(deg_res, 1, function(data) {
+        mx <- max(data[2:9])
+        mi <- min(data[2:9])
+        px <- which(data == mx)
+        pi <- which(data == mi)
 
-    ((px - pi) / 7) * (abs(mx-mi))
-  }) |> as.data.frame() |> rename_with(~ "skewness")
+        ((px - pi) / 7) * (abs(mx-mi))
+    }) |> as.data.frame() |> rename_with(~ "skewness")
 
-  write_tsv(cov_bias_skewness, "coverage_skewness")
+    write_tsv(cov_bias_skewness, "coverage_skewness")
 }
 ##################### 5'/3' BIAS ##############################################
 
@@ -428,77 +428,77 @@ get_coverage_bias <- function() {
 
 ##################### PCA OUTLIER  ############################################
 pca_outlier_global <- function() {
-  prj_message("PCA", 3)
+    prj_message("PCA", 3)
 
-  pca <- prcomp(t(g_vst), scale. = FALSE, center = TRUE)
+    pca <- prcomp(t(g_vst), scale. = FALSE, center = TRUE)
 
-  threshold <- 0.9
-  var_explained <- cumsum(pca$sdev^2) / sum(pca$sdev^2)
-  n_pcs <- min(which(var_explained >= threshold)[1], ncol(pca$x))
-  
-  scores <- as.data.frame(pca$x[, 1:n_pcs])
-  
-  loo_outliers <- function(scores, labels, n_pcs = 2, threshold = 1.5) {
-    scores_mat <- as.matrix(scores[, 1:n_pcs])
-    groups     <- unique(labels)
-    results    <- list()
+    threshold <- 0.9
+    var_explained <- cumsum(pca$sdev^2) / sum(pca$sdev^2)
+    n_pcs <- min(which(var_explained >= threshold)[1], ncol(pca$x))
     
-    for (grp in groups) {
-      idx <- which(labels == grp)
-      X   <- scores_mat[idx, , drop = FALSE]
-      n   <- nrow(X)
-      
-      if (n < 2) {
-        results[[as.character(grp)]] <- data.frame(
-          sample         = rownames(scores)[idx],
-          n_pcs          = n_pcs,
-          label          = grp,
-          influence      = 0
-        )
-      } else {
-        centroid  <- colMeans(X)
-      
-        influence <- sapply(seq_len(n), function(i) {
-          loo_centroid <- colMeans(X[-i, , drop = FALSE])
-          sqrt(sum((centroid - loo_centroid)^2))
-        })
-      
-        results[[as.character(grp)]] <- data.frame(
-          sample         = rownames(scores)[idx],
-          n_pcs          = n_pcs,
-          label          = grp,
-          influence      = influence
-        )
-      }
+    scores <- as.data.frame(pca$x[, 1:n_pcs])
+    
+    loo_outliers <- function(scores, labels, n_pcs = 2, threshold = 1.5) {
+        scores_mat <- as.matrix(scores[, 1:n_pcs])
+        groups     <- unique(labels)
+        results    <- list()
+        
+        for (grp in groups) {
+            idx <- which(labels == grp)
+            X   <- scores_mat[idx, , drop = FALSE]
+            n   <- nrow(X)
+            
+            if (n < 2) {
+                results[[as.character(grp)]] <- data.frame(
+                    sample         = rownames(scores)[idx],
+                    n_pcs          = n_pcs,
+                    label          = grp,
+                    influence      = 0
+                )
+            } else {
+                centroid  <- colMeans(X)
+                
+                influence <- sapply(seq_len(n), function(i) {
+                    loo_centroid <- colMeans(X[-i, , drop = FALSE])
+                    sqrt(sum((centroid - loo_centroid)^2))
+                })
+                
+                results[[as.character(grp)]] <- data.frame(
+                    sample         = rownames(scores)[idx],
+                    n_pcs          = n_pcs,
+                    label          = grp,
+                    influence      = influence
+                )
+            }
+        }
+        
+        all_results <- bind_rows(results)
+        
+        med     <- median(all_results$influence)
+        mad_val <- median(abs(all_results$influence - med))
+        cutoff  <- med + threshold * (mad_val + 1e-10)
+        
+        all_results |>
+            mutate(
+                cutoff     = cutoff,
+                is_outlier = influence > cutoff
+            )
     }
     
-    all_results <- bind_rows(results)
-    
-    med     <- median(all_results$influence)
-    mad_val <- median(abs(all_results$influence - med))
-    cutoff  <- med + threshold * (mad_val + 1e-10)
-    
-    all_results |>
-      mutate(
-        cutoff     = cutoff,
-        is_outlier = influence > cutoff
-      )
-  }
-  
 
-  result <- loo_outliers(scores, 
-                         labels = sample_info[rownames(scores),]$condition, 
-                         n_pcs = n_pcs, 
-                         threshold = 3)
+    result <- loo_outliers(scores, 
+                           labels = sample_info[rownames(scores),]$condition, 
+                           n_pcs = n_pcs, 
+                           threshold = 3)
 
-  result$var_explained = var_explained[n_pcs]
-  
-  n_pcs <- min(5, nrow(pca$x))
-  scores  <- as.data.frame(pca$x[, 1:n_pcs])
-  scores["__VAR",] <- (100*(pca$sdev^2 / sum(pca$sdev^2)))[1:n_pcs]
-  
-  write_tsv(scores, "pca")
-  write_tsv(result, "pca_outlier")
+    result$var_explained = var_explained[n_pcs]
+    
+    n_pcs <- min(5, nrow(pca$x))
+    scores  <- as.data.frame(pca$x[, 1:n_pcs])
+    scores["__VAR",] <- (100*(pca$sdev^2 / sum(pca$sdev^2)))[1:n_pcs]
+    
+    write_tsv(scores, "pca")
+    write_tsv(result, "pca_outlier")
 }
 ##################### PCA OUTLIER ##############################################
 
@@ -508,38 +508,38 @@ pca_outlier_global <- function() {
 
 ##################### CONDITION PCA ############################################
 condition_pca <- function() {
-  prj_message("CONDITION PCA", 3)
-  
-  pca <- prcomp(t(g_vst), center = TRUE, scale. = FALSE)
-  n_pcs <- min(nrow(pca$x), 5)
-  
-  pc_df <- as.data.frame(pca$x[, 1:n_pcs])
-  
-  pc_scaled <- pc_df
-  
-  factor_cols <- setdiff(colnames(sample_info), c("files", "names"))
-  
-  condition_qc <- do.call(rbind, lapply(factor_cols, function(fac) {
+    prj_message("CONDITION PCA", 3)
     
-    do.call(rbind, lapply(unique(sample_info[[fac]]), function(cond) {
-      
-      idx <- sample_info[[fac]] == cond
-      
-      pcs <- pc_scaled[idx, , drop = FALSE]
-      
-      if (nrow(pcs) < 2) { return(data.frame(factor = fac, name = cond, qc_score = 0)) }
-      
-      centroid <- apply(pcs, 2, median)
-      
-      d <- apply(pcs, 1, function(x) { sqrt(sum((x - centroid)^2)) })
-      
-      data.frame(factor = fac, name = cond, qc_score = median(d))
+    pca <- prcomp(t(g_vst), center = TRUE, scale. = FALSE)
+    n_pcs <- min(nrow(pca$x), 5)
+    
+    pc_df <- as.data.frame(pca$x[, 1:n_pcs])
+    
+    pc_scaled <- pc_df
+    
+    factor_cols <- setdiff(colnames(sample_info), c("files", "names"))
+    
+    condition_qc <- do.call(rbind, lapply(factor_cols, function(fac) {
+        
+        do.call(rbind, lapply(unique(sample_info[[fac]]), function(cond) {
+            
+            idx <- sample_info[[fac]] == cond
+            
+            pcs <- pc_scaled[idx, , drop = FALSE]
+            
+            if (nrow(pcs) < 2) { return(data.frame(factor = fac, name = cond, qc_score = 0)) }
+            
+            centroid <- apply(pcs, 2, median)
+            
+            d <- apply(pcs, 1, function(x) { sqrt(sum((x - centroid)^2)) })
+            
+            data.frame(factor = fac, name = cond, qc_score = median(d))
+        }))
     }))
-  }))
-  
-  condition_pca_df <<- condition_qc
-  
-  write_tsv(condition_pca_df, "condition_df")
+    
+    condition_pca_df <<- condition_qc
+    
+    write_tsv(condition_pca_df, "condition_df")
 }
 ##################### CONDITION PCA ############################################
 
@@ -549,30 +549,30 @@ condition_pca <- function() {
 
 ##################### CHECK FACTORS ###########################################
 size_factor_qc <- function() {
-  prj_message("SIZE FACTORS", 3)
+    prj_message("SIZE FACTORS", 3)
 
-  # https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html
+                                        # https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html
 
-  geoMeanNZ <- function(x) {
-    if (all(x == 0)) { 0 }
-    else {
-      exp(sum(log(x[x > 0])) / length(x[x > 0]))
+    geoMeanNZ <- function(x) {
+        if (all(x == 0)) { 0 }
+        else {
+            exp(sum(log(x[x > 0])) / length(x[x > 0]))
+        }
     }
-  }
-  geoMeans <- apply(g_vst, 1, geoMeanNZ)
-  loggeomeans <- log(geoMeans)
+    geoMeans <- apply(g_vst, 1, geoMeanNZ)
+    loggeomeans <- log(geoMeans)
 
-  df <- lapply(1:ncol(g_vst), function(smple) {
-    cnts <- g_vst[,smple]
-    r <- (log(cnts) - loggeomeans)[is.finite(loggeomeans) & cnts > 0]
-    smple_name <- colnames(g_vst)[smple]
-    data.frame(ratios = r, sample = smple_name, stringsAsFactors = FALSE)
-  }) %>% bind_rows()
+    df <- lapply(1:ncol(g_vst), function(smple) {
+        cnts <- g_vst[,smple]
+        r <- (log(cnts) - loggeomeans)[is.finite(loggeomeans) & cnts > 0]
+        smple_name <- colnames(g_vst)[smple]
+        data.frame(ratios = r, sample = smple_name, stringsAsFactors = FALSE)
+    }) %>% bind_rows()
 
-  df$replicate = df$sample
-  df$sample = sample_info[df$replicate,]$condition
+    df$replicate = df$sample
+    df$sample = sample_info[df$replicate,]$condition
 
-  write_tsv(df, "size_factor_qc")  
+    write_tsv(df, "size_factor_qc")  
 }
 ##################### CHECK FACTORS ###########################################
 
@@ -583,7 +583,7 @@ size_factor_qc <- function() {
 ##################### WRITE TSV RESULTS #######################################
 write_tsv <- function(df, file) {
     dir <- paste0("tsv/", outdir)
-  
+    
     if( !dir.exists(dir) ) {
         dir.create(dir, recursive = TRUE)
     }
@@ -633,9 +633,9 @@ render_html <- function() {
 
 ##################### RUN ANALYSES ############################################
 if(0) {
-  setwd("~/Projects/trqc/art")
-  setwd("~/Projects/trqc/CS")
-  setwd("~/Projects/trqc/PP")
+    setwd("~/Projects/trqc/art")
+    setwd("~/Projects/trqc/CS")
+    setwd("~/Projects/trqc/PP")
 }
 
 ### init paths ####

@@ -1,5 +1,5 @@
 ---
-title: "RNAseq QC Report"
+title: "RNA-seq QC Report"
 output: 
   flexdashboard::flex_dashboard:
     orientation: columns
@@ -53,9 +53,7 @@ lib_type_df      <- read.table(lib_type_file, row.names = 1, header = T, sep = "
 
 sample_names     <- rownames(samples_df)
 
-
 pca_df$norm_influence <- pca_df[sample_names,,drop=FALSE]$influence/pca_df[sample_names,,drop=FALSE]$cutoff
-
 
 gradient <- colorRampPalette(c("#2ecc71", "#f1c40f", "#e74c3c"))(100)
 
@@ -64,22 +62,22 @@ summary_df <- samples_df
 batch_cols <- setdiff(colnames(samples_df), c("condition"))
 
 for(fac in unique(condition_df$factor)) {
-  new_c <- paste0(fac, "_val")
-  summary_df[[new_c]] <- 0
-  for(name in unique(condition_df[condition_df$factor == fac,]$name)) {
-    summary_df[!is.na(match(summary_df[[fac]], name)),][[new_c]] <- 
-      condition_df[condition_df$factor == fac & condition_df$name == name,]$qc_score
-  }
+    new_c <- paste0(fac, "_val")
+    summary_df[[new_c]] <- 0
+    for(name in unique(condition_df[condition_df$factor == fac,]$name)) {
+        summary_df[!is.na(match(summary_df[[fac]], name)),][[new_c]] <- 
+            condition_df[condition_df$factor == fac & condition_df$name == name,]$qc_score
+    }
 }
 
 summary_df <- cbind(summary_df,
                     data.frame(
-                         Complexity=as.numeric(complexity_df[sample_names,,drop=FALSE]$top_100_transcripts),
-                         Complexity_val=as.numeric(complexity_df[sample_names,,drop=FALSE]$top_100_transcripts),
-                         Degradation=degradation_df[sample_names,,drop=FALSE]$skewness/6,
-                         Degradation_val=abs(degradation_df[sample_names,,drop=FALSE]$skewness/6),
-                         Condition=summary_df[sample_names,,drop=FALSE]$condition,
-                         Condition_val=summary_df[sample_names,,drop=FALSE]$condition_val
+                        Complexity=as.numeric(complexity_df[sample_names,,drop=FALSE]$top_100_transcripts),
+                        Complexity_val=as.numeric(complexity_df[sample_names,,drop=FALSE]$top_100_transcripts),
+                        Degradation=degradation_df[sample_names,,drop=FALSE]$skewness/6,
+                        Degradation_val=abs(degradation_df[sample_names,,drop=FALSE]$skewness/6),
+                        Condition=summary_df[sample_names,,drop=FALSE]$condition,
+                        Condition_val=summary_df[sample_names,,drop=FALSE]$condition_val
                     ))
 
 
@@ -94,7 +92,7 @@ Summary
 Column {data-width=650}
 -------------------------------------
 
-### Summary
+### **Summary Metrics**
 
 ```{r summary}
 column_names <- c("Complexity", "Degradation", "Condition", batch_cols)
@@ -103,40 +101,72 @@ column_vals <- paste0(column_names, "_val")
 summary_df <- summary_df |> dplyr::select(c(column_names, column_vals))
 
 for(coln in c("Condition", batch_cols)) {
-  summary_df[[coln]] <- paste0(summary_df[[coln]], " [", sprintf("%0.2f", summary_df[[paste0(coln, "_val")]]), "]")
+    summary_df[[coln]] <- paste0(summary_df[[coln]], " [", sprintf("%0.2f", summary_df[[paste0(coln, "_val")]]), "]")
 }
 
 val_idx <- which(colnames(summary_df) %in% column_vals)
+target_idx <- which(colnames(summary_df) %in% column_names)
 
 dt <- datatable(summary_df,
-          options = list(pageLength = 50,
-                         columnDefs = list(list(visible = FALSE, 
-                                                targets = val_idx)))) |>
-  formatStyle(0, fontWeight = "bold")
+                options = list(pageLength = 50,
+                               columnDefs = list(list(visible = FALSE,
+                                                      targets = val_idx)))) |>
+    formatStyle(0, fontWeight = "bold")
 
-  for(coln in column_names) {
+for(coln in column_names) {
     dt <- dt |> formatStyle(coln, fontWeight = "bold") |> 
-      formatStyle(coln, fontWeight="bold", color="white", 
-                  valueColumns = paste0(coln, "_val"), 
-                                        background = styleInterval(seq(0, ifelse(coln == "Complexity", 50, ifelse(coln == "Degradation", 2, 100)), length.out = 99), gradient))
-  }
+        formatStyle(coln, fontWeight="bold", color="white", 
+                    valueColumns = paste0(coln, "_val"), 
+                    background = styleInterval(seq(0, ifelse(coln == "Complexity", 50, ifelse(coln == "Degradation", 2, 100)), length.out = 99), gradient))
+}
 
-  dt |> formatRound(columns = c("Complexity", "Degradation"), digits = 2)
+dt |> formatRound(columns = c("Complexity", "Degradation"), digits = 2)
 ```
 
 
 Column {data-width=350}
 -------------------------------------
 
-### Help
+### **Description**
 
 #### **Summary Metrics**
 
-1. **Complexity**
+Three major factors can affect the quality of RNA-seq data and the reliability of downstream analyses. This page summarizes each factor using a single metric. Additional details and diagnostic plots are provided on the corresponding pages for each factor.
 
-1. **Defgradation**
+  &nbsp;
 
-1. **Condition**
+##### **1. Complexity**
+
+Library complexity describes how evenly sequencing reads are distributed across genes. If a large fraction of reads originates from only a small number of highly expressed genes, fewer reads remain available for the quantification of other genes. Consequently, fewer genes can be measured with sufficient precision for reliable differential expression analysis.
+
+Library complexity is measured here as the percentage of reads assigned to the 100 most abundant genes. Higher values indicate lower complexity.
+
+Low complexity can result from several factors, including overrepresentation of a small number of transcripts, rRNA contamination, poor RNA quality, or technical issues during library preparation.
+
+The **Complexity** page provides additional metrics that help identify the underlying cause of low complexity.
+
+  &nbsp;
+
+##### **2. Degradation**
+
+RNA degradation prior to library preparation can introduce systematic biases into transcript quantification. Degraded RNA molecules are fragmented before sequencing, reducing the likelihood that transcript sequences are represented uniformly. As a result, transcript abundance estimates may become biased and less comparable across samples.
+
+In high-quality libraries, read coverage is expected to be approximately uniform across the gene body. To assess degradation, the pipeline calculates the gene body coverage bias. Negative values indicate a 5′ bias, positive values indicate a 3′ bias, and values close to zero are expected for libraries with little or no degradation.
+
+The **Degradation** page provides detailed gene body coverage profiles for each sample.
+
+  &nbsp;
+
+##### **3. Replicate Consistency**
+
+Biological replicates are used to estimate variability within the same experimental condition and increase the reliability of differential expression analyses. Replicates belonging to the same condition are generally expected to exhibit similar gene expression patterns.
+
+To assess replicate consistency, principal component analysis (PCA) is performed on the expression matrix. For each condition, the mean distance of samples to the centroid of their condition group is calculated. Larger values indicate greater variability among replicates and may suggest the presence of outlier samples, sample mix-ups, or other technical issues.
+
+If additional metadata variables (batch factors) are available, the same metric is calculated for each factor. When samples cluster more strongly by a batch factor than by the biological condition of interest, this may indicate a batch effect that should be considered during downstream analyses.
+
+The **PCA** page contains both the sample correlation heatmap and PCA plots, which can be used to identify outlier samples and potential batch effects.
+
 
 
 
@@ -147,38 +177,60 @@ Complexity
 Column {.tabset}
 -------------------------------------
 
-### Read Assignment 
+### **Read Assignment**
 
 ```{r read assignment}
 ra_df <- complexity_df[,c("LowQuality","Nreads","TooShort","TooLong","Unmapped","NoFeature","Assigned","rRNA")] 
 ra_df$rRNA = -1 * ra_df$rRNA
 ra_df <- ra_df |> rownames_to_column("sample") |> 
-  pivot_longer(-sample) |> 
-  setNames(c("Samples", "Metric", "Reads"))
+    pivot_longer(-sample) |> 
+    setNames(c("Samples", "Metric", "Reads"))
 
 ra_df$Metric <- factor(ra_df$Metric,
-       levels = rev(c("Assigned", "rRNA",
-                      "NoFeature", "Unmapped",
-                      "Nreads", "TooShort",
-                      "TooLong", "LowQuality")))
+                       levels = rev(c("Assigned", "rRNA",
+                                      "NoFeature", "Unmapped",
+                                      "Nreads", "TooShort",
+                                      "TooLong", "LowQuality")))
 
 ra_df$Samples = factor(ra_df$Samples,
-      levels=rownames(samples_df[order(samples_df$condition, rownames(samples_df)),,drop=FALSE]))
+                       levels=rownames(samples_df[order(samples_df$condition, rownames(samples_df)),,drop=FALSE]))
 
 
 ggplotly(ggplot(ra_df, aes(x=Samples, y=Reads, fill=Metric)) + 
-           geom_hline(yintercept=c(50e6)) +
-           geom_bar(stat="identity") + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0)))
-
+         geom_hline(yintercept=c(50e6)) + xlab("") + ylab("Number of Reads") + 
+         geom_bar(stat="identity") + 
+         theme(axis.text.x = element_text(angle = 90, hjust = 0)))
 ```
 
-### Library Metrics
+
+### **Library Metrics**
 
 ```{r complexity}
+salmon_library_type <- c(
+    U   = "Unstranded",
+    SF  = "Stranded (forward)",
+    SR  = "Stranded (reverse)",
+    
+    IU  = "Inward, unstranded",
+    ISF = "Inward, stranded (forward)",
+    ISR = "Inward, stranded (reverse)",
+    
+    OU  = "Outward, unstranded",
+    OSF = "Outward, stranded (forward)",
+    OSR = "Outward, stranded (reverse)",
+    
+    MU  = "Matching orientation, unstranded",
+    MSF = "Matching orientation, stranded (forward)",
+    MSR = "Matching orientation, stranded (reverse)"
+)
+
+map_lib_type <- function(libtype) {
+    unname(paste0("[", libtype, "] ", salmon_library_type[libtype]))
+}
+
 metric_df <- complexity_df |> 
     mutate(condition=samples_df[rownames(complexity_df),,drop=FALSE]$condition,
-           lib_orientation=lib_type_df[rownames(complexity_df),,drop=FALSE]$lib_type,
+           lib_orientation=map_lib_type(lib_type_df[rownames(complexity_df),,drop=FALSE]$lib_type),
            lib_type=lib_type_df[rownames(complexity_df),,drop=FALSE]$e_type,
            mapping_rate=Assigned/TotalReads*100) |> 
     dplyr::select("condition", "lib_type", "lib_orientation", "mapping_rate",
@@ -189,25 +241,26 @@ column_names <- c("mapping_rate", "top_10_transcripts",  "top_50_transcripts", "
 datatable(metric_df, options = list(pageLength = 50)) |> formatRound(columns = column_names, digits = 2)
 ```
 
-### Gene Detection
+
+### **Gene Detection**
 
 ```{r gene detection}
 g_detect_plot <- g_detect_df |> 
-  dplyr::filter(transcripts %in% seq(0, nrow(g_detect_df), 10)) |> 
-  pivot_longer(-transcripts)
-  
+    dplyr::filter(transcripts %in% seq(0, nrow(g_detect_df), 10)) |> 
+    pivot_longer(-transcripts)
+
 g_detect_plot$condition <- samples_df[g_detect_plot$name,,drop=FALSE]$condition
 g_detect_plot$entropy <- complexity_df[g_detect_plot$name,]$shannon_entropy
 
-ggplotly(ggplot(g_detect_plot, aes(x=transcripts, y=value, group=name, col=entropy)) + geom_line())
-
+ggplotly(ggplot(g_detect_plot, aes(x=transcripts, y=value, group=name, col=entropy)) +
+         xlab("Number of Transcripts") + ylab("% Reads") + geom_line())
 ```
 
 
 Degradation
 =====================================
 
-### Genebody Coverage
+### **Genebody Coverage**
 
 ```{r genebody coverage}
 genebodycov_df <- genebodycov_df[rev(rownames(degradation_df[order(degradation_df$skewness,rownames(degradation_df)),,drop=FALSE])),]
@@ -216,20 +269,24 @@ rsc <- samples_df |> mutate(degradation = as.integer(summary_df[rownames(samples
 
 gb_cov_hm <- heatmaply(genebodycov_df, 
                        dendrogram = "none",
+                       scale = "none", 
+                       limits = c(0, 50),
                        row_side_colors = rsc[rownames(genebodycov_df),],
-                       colors = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(100))
+                       colors = c(colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(300),
+                                  colorRampPalette(c("#A50026", "#800080"))(200)))
 gb_cov_hm$x$layout$showlegend <- FALSE
 gb_cov_hm
 ```
 
 
-PCA
+
+Replicate Consistency
 =====================================
 
 Column {.tabset}
 -------------------------------------
 
-### Sample Correlation
+### **Sample Correlation**
 
 ```{r correlation heatmap}
 sample_cor <- cor(g_vst_df, method = "pearson", use = "pairwise.complete.obs")
@@ -239,10 +296,10 @@ heatmaply(sample_cor,
           colors = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(100))
 ```
 
-### PCA
+
+### **PCA**
 
 ```{r pca}
-
 names <- rownames(pca_data_df)
 names <- names[names != "__VAR"]
 
@@ -254,83 +311,82 @@ variance <- pca_data_df["__VAR",,drop=FALSE]
 
 
 ggplotly(ggplot(scores, aes(x = PC2, y = PC1, color = condition, label = sample, size=outlier)) +
-  geom_point()+
-  labs(
-    y = paste0("PC1 (", round(variance["PC1"], 1), "%)"),
-    x = paste0("PC2 (", round(variance["PC2"], 1), "%)")
-  ))
-
+         geom_point() +
+         labs(
+             y = paste0("PC1 [", round(variance["PC1"], 1), "%]"),
+             x = paste0("PC2 [", round(variance["PC2"], 1), "%]")
+         ))
 ```
 
-### PCA Pairs 
+
+### **PC Pairs**
 
 ```{r PCA_pairs}
 minpc <- min(ncol(variance), 5)
 
-p = ggpairs(
-  scores,
-  columns = 1:minpc,
-  aes(color = condition, label = sample),
-  upper = list(continuous = "points"),
-  lower = list(continuous = "points"),
-  diag = list(continuous = "densityDiag")
-)
+colnames(scores)[1:minpc] <- paste0(colnames(scores[,1:minpc]), " [", round(variance[colnames(scores[,1:minpc])], 1), "%]")
 
-ggplotly(p)
+ggplotly(ggpairs(
+    scores,
+    columns = 1:minpc,
+    aes(color = condition, label = sample),
+    upper = list(continuous = "points"),
+    lower = list(continuous = "points"),
+    diag = list(continuous = "densityDiag")
+))
 ```
 
 
 
 ```{r batch pca, results='asis', echo=FALSE, eval=has_batch_factors}
-  cat("
-
-### PCA by batch factor
-")
+cat("\n\n### **PCA by batch factor**\n\n\n")
 ```
 
 
 
 ```{r batch pca plot, eval=has_batch_factors}
-  names <- rownames(pca_data_df)
-  names <- names[names != "__VAR"]
+names <- rownames(pca_data_df)
+names <- names[names != "__VAR"]
 
-  pc <- pca_data_df[names,]
-  pc <- rownames_to_column(pc, "sample")
-  
-  pcl <- pivot_longer(pc, cols=c(paste0("PC", 1:5)), names_to = "PC", values_to = "rot")
+pc <- pca_data_df[names,]
+pc <- rownames_to_column(pc, "sample")
 
-  pcl <- cbind(pcl, samples_df[pcl$sample,])
+pcl <- pivot_longer(pc, cols=c(paste0("PC", 1:5)), names_to = "PC", values_to = "rot")
 
-  pcm <- pivot_longer(pcl, cols = colnames(samples_df))
+pcl <- cbind(pcl, samples_df[pcl$sample,])
 
-  compl <- list()
-  for(batch in colnames(samples_df)[!(colnames(samples_df) %in% "condition")]) {
-      batchs <- combn(unique(samples_df[[batch]]), 2, simplify = F)
-      compl <- append(compl, batchs)
-  }
+pcm <- pivot_longer(pcl, cols = colnames(samples_df))
 
-  ggplotly(ggplot(pcm, aes(x = value, y = rot, label=sample)) + geom_boxplot() + geom_jitter(width = 0.2) +
-      facet_grid(PC~name, scale = "free_x") + 
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)))
+compl <- list()
+for(batch in colnames(samples_df)[!(colnames(samples_df) %in% "condition")]) {
+    batchs <- combn(unique(samples_df[[batch]]), 2, simplify = F)
+    compl <- append(compl, batchs)
+}
+
+ggplotly(ggplot(pcm, aes(x = value, y = rot, label=sample)) + geom_boxplot() + geom_jitter(width = 0.2) +
+         facet_grid(PC~name, scale = "free_x") + xlab("") + ylab("") + 
+         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)))
 ```
 
 
 
-### PCA Outlier
+<!-- ### PCA Outlier -->
 
-```{r PCA outlier}
-pca_data_df[sample_names,] |> rownames_to_column("sample") |> 
-  mutate(condition=samples_df[sample_names,,drop=FALSE]$condition, 
-         is_outlier=pca_df[sample_names,]$is_outlier, 
-         outlier=pca_df[sample_names,]$norm_influence) |> 
-  pivot_longer(-c(sample, condition, outlier, is_outlier)) -> pca_plot_df
+<!-- ```{r PCA outlier} -->
+<!-- pca_data_df[sample_names,] |> rownames_to_column("sample") |>  -->
+<!--   mutate(condition=samples_df[sample_names,,drop=FALSE]$condition,  -->
+<!--          is_outlier=pca_df[sample_names,]$is_outlier,  -->
+<!--          outlier=pca_df[sample_names,]$norm_influence) |>  -->
+<!--   pivot_longer(-c(sample, condition, outlier, is_outlier)) -> pca_plot_df -->
 
 
-ggplotly(ggplot(pca_plot_df, aes(x=condition, y=value, label=sample)) + geom_boxplot() + 
-  geom_point(data=pca_plot_df[pca_plot_df$is_outlier,], col="red") + 
-  facet_wrap(~name, nrow=1) + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 0)))
-```
+<!-- ggplotly(ggplot(pca_plot_df, aes(x=condition, y=value, label=sample)) + geom_boxplot() +  -->
+<!--   geom_point(data=pca_plot_df[pca_plot_df$is_outlier,], col="red") +  -->
+<!--   facet_wrap(~name, nrow=1) +  -->
+<!--   theme(axis.text.x = element_text(angle = 90, hjust = 0))) -->
+<!-- ``` -->
+
+
 
 
 DGE
@@ -339,51 +395,33 @@ DGE
 Column {.tabset}
 -------------------------------------
 
-### Size Factor 
+### **Size Factor**
 (see https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html)
 
 ```{r size factor}
 ggplotly(ggplot(size_factor_df, aes(ratios, col = sample, group = replicate)) + 
-    geom_vline(xintercept=0) + geom_density())
+         geom_vline(xintercept=0) + geom_density())
 ```
 
 
 
-### by Condition
+### **by Condition**
 
 ```{r split_factor_plot}
 ggplotly(ggplot(size_factor_df, aes(ratios, group = replicate, col = sample)) + 
-    geom_vline(xintercept=0) + geom_density() + facet_wrap(~sample))
+         geom_vline(xintercept=0) + geom_density() + facet_wrap(~sample))
 ```
 
 
-### Dispersion
+### **Dispersion**
 
 ```{r dispersion}
 ggplotly(ggplot(dispersion_df |> rownames_to_column("gene"), aes(mean, geneEst, label=gene)) +
-  
-  geom_point(
-    color = "black",
-    alpha = 0.25,
-    size = 0.5
-  ) +
-  
-  geom_point(
-    aes(y = final),
-    color = "dodgerblue",
-    alpha = 0.25,
-    size = 0.5
-  ) +
-  
-  geom_line(
-    aes(y = fit),
-    color = "red",
-    linewidth = 1
-  ) +
-  
-  scale_x_log10() +
-  scale_y_log10())
-``` 
+         geom_point(color = "black", alpha = 0.25, size = 0.5) +
+         geom_point(aes(y = final), color = "dodgerblue", alpha = 0.25, size = 0.5) +
+         geom_line(aes(y = fit), color = "red", linewidth = 1) +
+         scale_x_log10() + scale_y_log10())
+```
 
 
 Sequencing QC
@@ -400,138 +438,137 @@ fastp_list <- lapply(files, fromJSON)
 names(fastp_list) <- gsub(".json", "", basename(files))
 
 get_quality_df <- function(x, sample_name, read, stage, status, metric) {
-  df <- as.data.frame(x[[paste0("read", read, "_", stage, "_filtering")]][[metric]])
-  if(nrow(df) > 0) {
-    df$position <- seq_len(nrow(df))
-    df$sample <- sample_name
-    df$status <- status
-    df
-  }
+    df <- as.data.frame(x[[paste0("read", read, "_", stage, "_filtering")]][[metric]])
+    if(nrow(df) > 0) {
+        df$position <- seq_len(nrow(df))
+        df$sample <- sample_name
+        df$status <- status
+        df
+    }
 }
 
 quality_df <- map2_dfr(fastp_list, names(fastp_list), \(x, n) {
-  rbind(
-    get_quality_df(x, n, 1, "before", "untrimmed forward", "quality_curves"),
-    get_quality_df(x, n, 2, "before", "untrimmed reverse","quality_curves"),
-    get_quality_df(x, n, 1, "after",  "trimmed forward","quality_curves"),
-    get_quality_df(x, n, 2, "after",  "trimmed reverse","quality_curves")
-  )
+    rbind(
+        get_quality_df(x, n, 1, "before", "untrimmed forward", "quality_curves"),
+        get_quality_df(x, n, 2, "before", "untrimmed reverse","quality_curves"),
+        get_quality_df(x, n, 1, "after",  "trimmed forward","quality_curves"),
+        get_quality_df(x, n, 2, "after",  "trimmed reverse","quality_curves")
+    )
 })
 
 gc_df <- map2_dfr(fastp_list, names(fastp_list), \(x, n) {
-  rbind(
-    get_quality_df(x, n, 1, "before", "untrimmed forward", "content_curves"),
-    get_quality_df(x, n, 2, "before", "untrimmed reverse","content_curves"),
-    get_quality_df(x, n, 1, "after",  "trimmed forward","content_curves"),
-    get_quality_df(x, n, 2, "after",  "trimmed reverse","content_curves")
-  )
+    rbind(
+        get_quality_df(x, n, 1, "before", "untrimmed forward", "content_curves"),
+        get_quality_df(x, n, 2, "before", "untrimmed reverse","content_curves"),
+        get_quality_df(x, n, 1, "after",  "trimmed forward","content_curves"),
+        get_quality_df(x, n, 2, "after",  "trimmed reverse","content_curves")
+    )
 })
 
 extract_insert_size <- function(x, sample_name) {
-  if("insert_size" %in% names(x)) {
-    hist <- x$insert_size$histogram
-  
-    last_nonzero <- max(which(hist != 0))
-  
-    hist_trimmed <- hist[seq_len(last_nonzero)]
-  
-    tibble(
-      insert_size = seq_along(hist_trimmed),
-      count = hist_trimmed,
-      sample = sample_name
-    )
-  }
+    if("insert_size" %in% names(x)) {
+        hist <- x$insert_size$histogram
+        
+        last_nonzero <- max(which(hist != 0))
+        
+        hist_trimmed <- hist[seq_len(last_nonzero)]
+        
+        tibble(
+            insert_size = seq_along(hist_trimmed),
+            count = hist_trimmed,
+            sample = sample_name
+        )
+    }
 }
 
 insert_df <- map2_dfr(fastp_list, names(fastp_list), extract_insert_size)
 ```
 
 
-### FastP QC
+### **FastP QC**
 
 ```{r fastp_qc}
-mqc <- ggplot(quality_df, aes(x = position, y = mean, color = sample)) +
-  geom_line(alpha = 0.7) + ylim(0, 40) + 
-  labs(x = "Position", y = "Quality score") +
-  facet_wrap(~status) 
-
-ggplotly(mqc)
+ggplotly(ggplot(quality_df, aes(x = position, y = mean, color = sample)) +
+         geom_line(alpha = 0.7) + ylim(0, 40) + 
+         labs(x = "Position", y = "Quality score") +
+         facet_wrap(~status))
 ```
 
-### FastP GC
+### **FastP GC**
 
 ```{r fastp_gc}
-mgc <- ggplot(gc_df, aes(x = position, y = GC*100, color = sample)) +
-  geom_line(alpha = 0.7) + 
-  labs(x = "Position", y = "GC %") +
-  facet_wrap(~status) 
-ggplotly(mgc)
+ggplotly(ggplot(gc_df, aes(x = position, y = GC*100, color = sample)) +
+         geom_line(alpha = 0.7) + 
+         labs(x = "Position", y = "GC %") +
+         facet_wrap(~status))
 ```
 
-### FastP Insert Size
+### **FastP Insert Size**
 
 ```{r fastp_insert_size}
 if(nrow(insert_df) > 0) {
-isp <- ggplot(insert_df, aes(insert_size, count, color = sample)) +
-  geom_line(alpha = 0.7) +
-  theme_minimal() +
-  labs(x = "Insert size (bp)", y = "Read count")
-ggplotly(isp)
+    isp <- ggplot(insert_df, aes(insert_size, count, color = sample)) +
+        geom_line(alpha = 0.7) +
+        theme_minimal() +
+        labs(x = "Insert size (bp)", y = "Read count")
+    ggplotly(isp)
 }
 ```
 
 
 ```{r read falco qc, include=FALSE}
 update_samples <- function(x) {
-  read_type = c("untrimmed fwd", "untrimmed rev", "trimmed fwd", "trimmed rev", "untrimmed single", "trimmed single")
-  names(read_type) = c("1", "2", "R1", "R2", "s", "S")
-  x <- x |> extract(Sample, into = c("Sample", "read"), regex = "(.+)_(R?[sS12])$")
-  x$read = factor(x$read)
-  levels(x$read)=read_type[as.character(levels(x$read))]
-  x
+    read_type = c("untrimmed fwd", "untrimmed rev", "trimmed fwd", "trimmed rev", "untrimmed single", "trimmed single")
+    names(read_type) = c("1", "2", "R1", "R2", "s", "S")
+    x <- x |> extract(Sample, into = c("Sample", "read"), regex = "(.+)_(R?[sS12])$")
+    x$read = factor(x$read)
+    levels(x$read)=read_type[as.character(levels(x$read))]
+    x
 }
+
 
 read_falco <- function(path) {
-  con   <- gzcon(file(path, "rb"))
-  lines <- readLines(con, warn = FALSE); close(con)
-  sec_idx <- grep("^>>", lines)
-  secs    <- list()
-  for (i in seq_along(sec_idx)) {
-    hdr <- lines[sec_idx[i]]
-    if (hdr == ">>END_MODULE") next
-    end <- if (i < length(sec_idx)) sec_idx[i+1]-1 else length(lines)
-    body <- lines[(sec_idx[i]+1):end]
-    body <- body[!grepl("^>>END_MODULE", body)]
-    nm   <- str_remove(hdr, "^>>") |> str_remove("\\s+(pass|warn|fail)$") |> str_trim()
-    st   <- str_extract(hdr, "(pass|warn|fail)$")
-    secs[[nm]] <- list(status = st %||% "unknown", lines = body)
-  }
-  secs
+    con   <- gzcon(file(path, "rb"))
+    lines <- readLines(con, warn = FALSE); close(con)
+    sec_idx <- grep("^>>", lines)
+    secs    <- list()
+    for (i in seq_along(sec_idx)) {
+        hdr <- lines[sec_idx[i]]
+        if (hdr == ">>END_MODULE") next
+        end <- if (i < length(sec_idx)) sec_idx[i+1]-1 else length(lines)
+        body <- lines[(sec_idx[i]+1):end]
+        body <- body[!grepl("^>>END_MODULE", body)]
+        nm   <- str_remove(hdr, "^>>") |> str_remove("\\s+(pass|warn|fail)$") |> str_trim()
+        st   <- str_extract(hdr, "(pass|warn|fail)$")
+        secs[[nm]] <- list(status = st %||% "unknown", lines = body)
+    }
+    secs
 }
 
+
 parse_basic <- function(sec) {
-  ls <- sec$lines[!grepl("^#", sec$lines)]
-  m  <- str_split_fixed(ls, "\t", 2)
-  setNames(m[,2], m[,1])
+    ls <- sec$lines[!grepl("^#", sec$lines)]
+    m  <- str_split_fixed(ls, "\t", 2)
+    setNames(m[,2], m[,1])
 }
 
 
 parse_table <- function(sec) {
-  hi <- tail(grep("^#", sec$lines), 1); if (is.na(hi)) return(NULL)
-  hd <- str_remove(sec$lines[hi], "^#") |> str_split("\t") |> unlist()
-  dl <- sec$lines[(hi+1):length(sec$lines)]; dl <- dl[nzchar(dl)]
-  if (!length(dl)) return(NULL)
-  mat <- str_split_fixed(dl, "\t", length(hd))
-  df  <- as.data.frame(mat, stringsAsFactors = FALSE)
-  colnames(df) <- make.names(hd); df
+    hi <- tail(grep("^#", sec$lines), 1); if (is.na(hi)) return(NULL)
+    hd <- str_remove(sec$lines[hi], "^#") |> str_split("\t") |> unlist()
+    dl <- sec$lines[(hi+1):length(sec$lines)]; dl <- dl[nzchar(dl)]
+    if (!length(dl)) return(NULL)
+    mat <- str_split_fixed(dl, "\t", length(hd))
+    df  <- as.data.frame(mat, stringsAsFactors = FALSE)
+    colnames(df) <- make.names(hd); df
 }
 
 falco_files <- expand.grid(falco_folder, 
-            c("/untrimmed/", "/trimmed/"), 
-            rownames(samples_df), "_", 
-            c("1", "2", "s", "R1", "R2", "S"), c(".fastq.gz", ".fq.gz")) |>
-  apply(1, paste0, collapse = "") |>
-  (\(x) x[file.exists(x)])()
+                           c("/untrimmed/", "/trimmed/"), 
+                           rownames(samples_df), "_", 
+                           c("1", "2", "s", "R1", "R2", "S"), c(".fastq.gz", ".fq.gz")) |>
+    apply(1, paste0, collapse = "") |>
+    (\(x) x[file.exists(x)])()
 
 sample_names <- gsub("\\.f(ast|)q\\.gz$", "", basename(falco_files))
 falco_data <- setNames(lapply(falco_files, read_falco), sample_names)
@@ -539,18 +576,19 @@ falco_data <- setNames(lapply(falco_files, read_falco), sample_names)
 has_falco <- length(falco_files) > 0
 ```
 
-```{r falco1, results='asis', echo=FALSE, eval=has_falco}
-  cat("
 
-### Per base sequence quality
-")
+
+```{r falco1, results='asis', echo=FALSE, eval=has_falco}
+cat("\n\n### **Per base sequence quality**\n\n")
 ```
+
+
 
 ```{r Per base sequence quality, eval=has_falco}
 pbq_df <- map_dfr(names(falco_data), function(s) {
-  sec <- falco_data[[s]][["Per base sequence quality"]]; if(is.null(sec)) return(NULL)
-  df  <- parse_table(sec); if(is.null(df)) return(NULL)
-  df$Sample <- s; df
+    sec <- falco_data[[s]][["Per base sequence quality"]]; if(is.null(sec)) return(NULL)
+    df  <- parse_table(sec); if(is.null(df)) return(NULL)
+    df$Sample <- s; df
 }) |> mutate(Base=as.integer(str_extract(Base,"^[0-9]+")), Mean=as.numeric(Mean))
 
 pbq_df <- update_samples(pbq_df)
@@ -559,17 +597,16 @@ ggplotly(ggplot(pbq_df, aes(x=Base, y=Median, group=Sample, col=Sample)) + geom_
 ```
 
 ```{r falco2, results='asis', echo=FALSE, eval=has_falco}
-  cat("
-
-### Per-sequence quality
-")
+cat("\n\n### **Per-sequence quality**\n\n")
 ```
+
+
 
 ```{r per sequence quality, eval=has_falco}
 psq_df <- map_dfr(names(falco_data), function(s) {
-  sec <- falco_data[[s]][["Per sequence quality scores"]]; if(is.null(sec)) return(NULL)
-  df  <- parse_table(sec); if(is.null(df)) return(NULL)
-  df$Sample <- s; df
+    sec <- falco_data[[s]][["Per sequence quality scores"]]; if(is.null(sec)) return(NULL)
+    df  <- parse_table(sec); if(is.null(df)) return(NULL)
+    df$Sample <- s; df
 }) |> mutate(Quality=as.integer(Quality), Count=as.numeric(Count))
 
 psq_df <- update_samples(psq_df)
@@ -578,27 +615,25 @@ ggplotly(ggplot(psq_df, aes(x=Quality, y=Count, col=Sample)) + geom_line() + fac
 ```
 
 ```{r falco3, results='asis', echo=FALSE, eval=has_falco}
-  cat("
-
-### Adapter content
-")
+cat("\n\n### **Adapter content**\n\n")
 ```
+
 
 
 ```{r adapter content, eval=has_falco}
 ac_df <- map_dfr(names(falco_data), function(s) {
-  sec <- falco_data[[s]][["Adapter Content"]]; if(is.null(sec)) return(NULL)
-  df  <- parse_table(sec); if(is.null(df)) return(NULL)
-  df$Sample <- s; df
+    sec <- falco_data[[s]][["Adapter Content"]]; if(is.null(sec)) return(NULL)
+    df  <- parse_table(sec); if(is.null(df)) return(NULL)
+    df$Sample <- s; df
 }) |> pivot_longer(-c(Position,Sample), names_to="Adapter", values_to="Pct") |>
-  mutate(Position=as.integer(str_extract(Position,"^[0-9]+")), Pct=as.numeric(Pct))
+    mutate(Position=as.integer(str_extract(Position,"^[0-9]+")), Pct=as.numeric(Pct))
 
 ac_df <- update_samples(ac_df)
 
 ac_list <- ac_df |> group_by(Adapter) |> summarize(max = max(Pct)) |> filter(max >= 0.05) |> dplyr::select(Adapter)
 ac_df_filt <- ac_df |> filter(Adapter %in% ac_list)
 if(nrow(ac_df_filt) > 0) {
-  ggplotly(ggplot(ac_df_filt, aes(x=Position, y=Pct, col=Sample)) + geom_line() +
+    ggplotly(ggplot(ac_df_filt, aes(x=Position, y=Pct, col=Sample)) + geom_line() +
              facet_wrap(~read+Adapter))
 }
 ```
@@ -606,46 +641,92 @@ if(nrow(ac_df_filt) > 0) {
 
 
 ```{r benchmark, results='asis', echo=FALSE, eval=has_benchmark}
-  cat("
-Benchmarks
-=====================================
-
-Column 
--------------------------------------
-
-### Benchmark
-")
+cat("Benchmarks\n=====================================\nColumn\n-------------------------------------\n\n### **Benchmarks**\n\n")
 ```
+
+
 
 ```{r benchmarks, eval=has_benchmark}
-  files <- list.files(benchmark_folder, pattern = "\\.txt$", full.names = TRUE)
+files <- list.files(benchmark_folder, pattern = "\\.txt$", full.names = TRUE)
 
-  bench_df <- map_dfr(files, function(f) {
+bench_df <- map_dfr(files, function(f) {
     nm <- basename(f) |> str_remove("\\.txt$")
     parts <- str_split(nm, "\\.", simplify = TRUE)
-
+    
     rule <- parts[1]
     wildcard <- paste(parts[-1], collapse = ".")
-
+    
     read_tsv(f, show_col_types = FALSE) |>
-      mutate(rule = rule, wildcard = wildcard, file = basename(f))
-  })
+        mutate(rule = rule, wildcard = wildcard, file = basename(f))
+})
 
-  if(! "threads" %in% names(bench_df)) { bench_df$threads <- 0 } # only available with `snakemake --benchmark-extended` 
+## only available with `snakemake --benchmark-extended` 
+if(! "threads" %in% names(bench_df)) { bench_df$threads <- 0 } 
 
-  memory <- bench_df |> dplyr::select(c(rule, value = max_rss, sample = wildcard, threads)) |> 
+memory <- bench_df |> dplyr::select(c(rule, value = max_rss, sample = wildcard, threads)) |> 
     mutate(metric = "memory_mb")
-  time <- bench_df |> dplyr::select(c(rule, value = s, sample = wildcard, threads)) |> 
+time <- bench_df |> dplyr::select(c(rule, value = s, sample = wildcard, threads)) |> 
     mutate(metric = "runtime_s")
 
-  bdf <- rbind(memory, time)
+bdf <- rbind(memory, time)
 
-  bdf$threads = factor(bdf$threads)
+bdf$threads = factor(bdf$threads)
 
-  ggplotly(ggplot(bdf, aes(x = rule, y = value, label=sample, col = threads)) +
-             geom_jitter(width=0.25) + facet_wrap(~metric, scale="free_y") +
-             theme(axis.text.x = element_text(angle = 90, hjust = 0)))
+ggplotly(ggplot(bdf, aes(x = rule, y = value, label=sample, col = threads)) +
+         geom_jitter(width=0.25) + facet_wrap(~metric, scale="free_y") +
+         theme(axis.text.x = element_text(angle = 90, hjust = 0)))
 ```
+
+
 
 Help
 =====================================
+
+Column {.tabset}
+-------------------------------------
+
+### **Library Complexity**
+
+#### **Read Assignment**
+
+#### **Library Metrics**
+
+#### **Gene Detection**
+
+
+
+### **RNA Degradation**
+
+#### **Genebody Coverage**
+
+
+
+### **Replicate Consistency**
+
+#### **Sample Correlation**
+
+#### **Principle Component Analysis**
+
+#### **Principle Components Pairs**
+
+
+
+### **Differentiag Gene Expression Analysis**
+
+#### **Size Factor**
+
+#### **by Condition**
+
+#### **Dispersion**
+
+
+
+### **Sequencing QC**
+
+#### **FastP**
+
+#### **FastQC/Falco**
+
+
+
+### Benchmark

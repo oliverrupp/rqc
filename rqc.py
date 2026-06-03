@@ -273,6 +273,7 @@ class RQCPipeline:
         max_jobs: int,
         dry_run: bool,
         rerun_incomplete: bool,
+        keep_going: bool,
         executor: Optional[str] = None,
         hpc_config: Optional[Path] = None,
         organisms: Optional[List[str]] = None,
@@ -309,24 +310,22 @@ class RQCPipeline:
         if dry_run:
             cmd.append("--dry-run")
 
-
         # Add rerun incomplete
         if rerun_incomplete:
             cmd.append("--rerun-incomplete")
 
+        # Add keep going
+        if keep_going:
+            cmd.append("--keep-going")
             
         # Add config file (in addition to profile for HPC)
         if config_file:
             cmd.extend(["--configfile", str(config_file)])
-        
-        # Add target rule or organisms
-        if organisms:
-            validator = RQCValidator(self.project_dir)
-            targets = validator.get_report_targets(organisms)
-            cmd.extend(targets)
-        else:
-            # Default: run report rule
-            cmd.append("report")
+
+        # Add targets
+        validator = RQCValidator(self.project_dir)
+        targets = validator.get_report_targets(organisms)
+        cmd.extend(targets)
         
         return cmd
     
@@ -353,7 +352,6 @@ def parse_arguments() -> argparse.Namespace:
         epilog="""
 Examples:
   rqc.py --no-conda --max-cpus 16
-  rqc.py --hpc slurm --max-jobs 100
   rqc.py --hpc slurm --max-jobs 100 --hpc-config profile.yaml
   rqc.py --hpc lsf --max-jobs 50 --organism subproj1,subproj2
   rqc.py --list-organisms
@@ -389,7 +387,7 @@ Supported HPC executors:
         "--hpc",
         type=str,
         metavar="EXECUTOR",
-        help="Run pipeline on HPC cluster with specified executor (slurm, lsf, pbs, slurm_singularity, lsf_singularity). Default: local execution"
+        help="Run pipeline on HPC cluster with specified executor (slurm, lsf, pbs). Default: local execution"
     )
     
     # Conda
@@ -411,8 +409,8 @@ Supported HPC executors:
     parser.add_argument(
         "--max-memory",
         type=int,
-        default=32000,
-        help="Maximum CPUs for local execution (default: 8)"
+        default=16000,
+        help="Maximum available memory (default: 16 Gb)"
     )
     
     parser.add_argument(
@@ -450,7 +448,13 @@ Supported HPC executors:
         help="Rerun incomplete jobs"
     )
 
-    
+    # keep going
+    parser.add_argument(
+        "--keep-going",
+        action="store_true",
+        help="Keep going if jobs fail"
+    )
+
     # just validate
     parser.add_argument(
         "--validate",
@@ -464,8 +468,6 @@ Supported HPC executors:
         type=Path,
         help="Snakemake config file (YAML format)"
     )
-    
-    # Help is automatic
     
     return parser.parse_args()
 
@@ -495,7 +497,6 @@ def list_organisms(project_dir: Path) -> int:
         f"Sample files"
     )
     print("-" * 70)
-
 
     for organism in sorted(all_organisms):
         info = mem_info[organism]
@@ -613,6 +614,7 @@ def main():
         max_jobs=args.max_jobs,
         dry_run=args.dry_run,
         rerun_incomplete=args.rerun_incomplete,
+        keep_going=args.keep_going,
         executor=args.hpc,
         hpc_config=args.hpc_config,
         organisms=selected_organisms,
