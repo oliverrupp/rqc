@@ -10,6 +10,7 @@ localrules: report, gentrome, gtf, transcripts, quantiles, rrna, rrna_gtf, fai, 
 
 
 
+
 def get_inputs(plant, type):
     for p in zip(PLANTS2, SAMPLES):
         filetocheck_1 = "%s/reads/%s_1.fq.gz" % (p[0], p[1])
@@ -38,9 +39,10 @@ def get_inputs(plant, type):
                         yield("{plant}/results/falco/trimmed/{sample}_R2.fastq.gz").format(plant=p[0], sample=p[1])
                 case _:
                     yield("{plant}/results/{type}/{sample}/quant.sf").format(plant=p[0], type=type, sample=p[1])
-                        
 
 
+
+                    
 def get_sample_report_files():
     for p in zip(PLANTS, GROUPS):
         samples_file = "%s/reference/samples%s.tsv" % (p[0], p[1])
@@ -55,9 +57,6 @@ def get_sample_report_files():
 
 
 
-
-
-
 MAX_MEM_MB = config["max_mem_mb"]
 
 def use_large(wc):
@@ -68,7 +67,7 @@ def use_large(wc):
     return required_mb <= MAX_MEM_MB
 
 
-            
+
 rule report:
     input: lambda wildcards: get_sample_report_files()
 
@@ -170,6 +169,7 @@ rule gentrome:
                 fi
            fi
            """
+
 
 
 rule gtf:
@@ -280,7 +280,6 @@ rule trim_se:
 
 
 
-    
 rule salmon_pe:
     input:
         r1pe="{plant}/results/trimmed/{sample}_R1.fastq.gz",
@@ -335,7 +334,6 @@ rule salmon_se:
            """
 
 
-    
 
 rule salmon_small_base:
     threads:
@@ -359,7 +357,6 @@ use rule salmon_small_base as salmon_small_se with:
     benchmark: "{plant}/benchmark/salmon_se_{type}.{sample}.txt"
 
 
-
 use rule salmon_small_base as salmon_small_pe with:
     input:
         reads=["{plant}/results/trimmed/{sample}_R1.fastq.gz",
@@ -371,13 +368,11 @@ use rule salmon_small_base as salmon_small_pe with:
 
 
 
-
 rule fai:
     input: "{genome}"
     output: "{genome}.fai"
     conda: "envs/samtools.yaml"
     shell: "samtools faidx {input}"
-
 
 
 
@@ -388,6 +383,7 @@ rule falco_base:
            falco {input} -skip-report -q \
                  -D {output.data} -S {output.summary}
            """
+
 
 use rule falco_base as falco_untrimmed with:
     input: "{plant}/reads/{name}"
@@ -486,6 +482,7 @@ rule assembly:
            """
 
 
+
 rule star_map:
     input: 
         r1pe="{plant}/results/trimmed/{sample}_R1.fastq.gz",
@@ -542,6 +539,7 @@ rule sort_bam:
             """
 
 
+
 rule scallop:
     input: "{plant}/results/bam/{sample}/STARAligned.sorted.bam"
     output: "{plant}/results/scallop/{sample}/scallop.gtf"
@@ -557,6 +555,7 @@ rule scallop:
             scallop2 -i {input} -o {output} --threads {threads} --verbose 0
            """
            
+
 
 rule star_index:
     input:
