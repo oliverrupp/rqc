@@ -102,7 +102,7 @@ rule index_full:
     threads:
         24
     resources:
-        mem_mb=32000,
+        mem_mb=MAX_MEM_MB,
         runtime=360,
         nodes=1,
         cpus_per_task=24
@@ -114,7 +114,7 @@ rule index_full:
               DECOY=""
            fi
            salmon --no-version-check index -p {threads} \
-           -i {wildcards.plant}/results/index/salmon \
+                  -i {wildcards.plant}/results/index/salmon \
                   -t {input.t} $DECOY --keepDuplicates && \
            touch {output}
            """
@@ -129,7 +129,7 @@ rule index_small:
     threads:
         8
     resources:
-        mem_mb=16000,
+        mem_mb=MAX_MEM_MB,
         runtime=360,
         nodes=1,
         cpus_per_task=8
@@ -290,7 +290,7 @@ rule salmon_pe:
     threads:
         16 
     resources:
-        mem_mb=64000,
+        mem_mb=MAX_MEM_MB,
         runtime=360,
         nodes=1,
         cpus_per_task=16
@@ -317,7 +317,7 @@ rule salmon_se:
     threads:
         16
     resources:
-        mem_mb=64000,
+        mem_mb=MAX_MEM_MB,
         runtime=360,
         nodes=1,
         cpus_per_task=16

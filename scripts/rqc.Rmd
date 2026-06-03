@@ -674,6 +674,7 @@ bdf$threads = factor(bdf$threads)
 
 ggplotly(ggplot(bdf, aes(x = rule, y = value, label=sample, col = threads)) +
          geom_jitter(width=0.25) + facet_wrap(~metric, scale="free_y") +
+         xlab("Job") + ylab("") + 
          theme(axis.text.x = element_text(angle = 90, hjust = 0)))
 ```
 
@@ -689,25 +690,45 @@ Column {.tabset}
 
 #### **Read Assignment**
 
+-
+
+  &nbsp;
+
 #### **Library Metrics**
+
+-
+
+  &nbsp;
 
 #### **Gene Detection**
 
+- 
 
 
 ### **RNA Degradation**
 
 #### **Genebody Coverage**
 
+-
 
 
 ### **Replicate Consistency**
 
 #### **Sample Correlation**
 
+-
+
+  &nbsp;
+
 #### **Principle Component Analysis**
 
+-
+
+  &nbsp;
+
 #### **Principle Components Pairs**
+
+-
 
 
 
@@ -715,9 +736,19 @@ Column {.tabset}
 
 #### **Size Factor**
 
+-
+
+  &nbsp;
+
 #### **by Condition**
 
+-
+
+  &nbsp;
+
 #### **Dispersion**
+
+-
 
 
 
@@ -725,8 +756,16 @@ Column {.tabset}
 
 #### **FastP**
 
+-
+
+  &nbsp;
+
+
 #### **FastQC/Falco**
 
+- 
 
 
 ### Benchmark
+
+-

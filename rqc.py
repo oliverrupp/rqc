@@ -18,6 +18,7 @@ Example:
 import argparse
 import os
 import sys
+import psutil
 import subprocess
 import logging
 from pathlib import Path
@@ -285,6 +286,16 @@ class RQCPipeline:
         # Add workflow directory
         cmd.extend(["--directory", str(self.project_dir)])
 
+        if execution_mode != "hpc":
+            mem = psutil.virtual_memory()
+            mem_mb = mem.total // 1024**2
+
+            if max_memory > mem_mb:
+                logger.warning(f"requested max-memory {max_memory} exceeds total RAM {mem_mb}!")
+                logger.warning(f"setting max-memory to {mem_mb}!")
+                max_memory = mem_mb
+
+            
         cmd.extend(["--resources", f"mem_mb={max_memory}"])
         cmd.extend(["--config", f"max_mem_mb={max_memory}"])
         
