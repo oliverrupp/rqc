@@ -270,7 +270,7 @@ idx75 <- which.min(abs(fractions - 0.75))
 
 gain75 <- apply(g_detect_df, 2, \(y) {
   (y[length(y)] - y[idx75]) / y[length(y)]
-}) * 1000
+}) * 100
 
 g_detect_plot <- g_detect_df |> mutate(fraction=rownames(g_detect_df)) |> pivot_longer(-fraction)
 
@@ -278,7 +278,7 @@ g_detect_plot$condition <- samples_df[g_detect_plot$name,,drop=FALSE]$condition
 g_detect_plot$effective_gene_count <- exp(complexity_df[g_detect_plot$name,]$shannon_entropy)
 g_detect_plot$fraction = as.numeric(g_detect_plot$fraction) - 1
 
-g_detect_plot <- g_detect_plot |> mutate(tail_gain=round(gain75[g_detect_plot$name]))
+g_detect_plot <- g_detect_plot |> mutate(tail_gain=round(gain75[g_detect_plot$name], 1))
 
 g_detect_plot$tail_gain = factor(g_detect_plot$tail_gain, levels=sort(unique(g_detect_plot$tail_gain)))
 
@@ -703,7 +703,7 @@ bench_df <- bind_rows(
         cbind(read.delim(f, check.names = FALSE, stringsAsFactors = FALSE), file = basename(f))
     })) |> mutate(stem = tools::file_path_sans_ext(file),
                   rule = sub("\\..*", "", stem),
-                  wildcard = sub("^[^.]+\\.?", "", stem)) |> select(-stem) 
+                  wildcard = sub("^[^.]+\\.?", "", stem)) |> dplyr::select(-stem) 
 
 ## only available with `snakemake --benchmark-extended` 
 if(! "threads" %in% names(bench_df)) { bench_df$threads <- 0 } 
