@@ -40,20 +40,20 @@ dispersion_file  <- paste0(prj_dir, "/tsv/", data_dir, "/g_dispersion.tsv")
 lib_type_file    <- paste0(prj_dir, "/tsv/", data_dir, "/lib_type.tsv")
 frag_len_file    <- paste0(prj_dir, "/tsv/", data_dir, "/fragment_length.tsv")
 
-samples_df       <- read.table(samples_file, header = T, sep = "\t") |> column_to_rownames("sample")
-condition_df     <- read.table(condition_file, row.names = 1, header = T, sep = "\t")
-complexity_df    <- read.table(complexity_file, row.names = 1, header = T, sep = "\t")
-jaccard_df       <- read.table(jaccard_file, row.names = 1, header = T, sep = "\t")
-degradation_df   <- read.table(degradation_file, row.names = 1, header = T, sep = "\t")
-genebodycov_df   <- read.table(genebodycov_file, row.names = 1, header = T, sep = "\t")
-pca_df           <- read.table(pca_file, row.names = 2, header = T, sep = "\t")
-pca_data_df      <- read.table(pca_data_file, row.names = 1, header = T, sep = "\t")
-g_detect_df      <- read.table(g_detect_file, row.names = 1, header = T, sep = "\t")
-g_vst_df         <- read.table(g_vst_file, row.names = 1, header = T, sep = "\t")
-size_factor_df   <- read.table(size_factor_file, row.names = 1, header = T, sep = "\t")
-dispersion_df    <- read.table(dispersion_file, row.names = 1, header = T, sep = "\t")
-lib_type_df      <- read.table(lib_type_file, row.names = 1, header = T, sep = "\t")
-frag_len_df      <- read.table(frag_len_file, row.names = 1, header = T, sep = "\t")
+samples_df       <- read.table(samples_file,     check.names = FALSE, header = T, sep = "\t") |> column_to_rownames("sample")
+condition_df     <- read.table(condition_file,   check.names = FALSE, row.names = 1, header = T, sep = "\t")
+complexity_df    <- read.table(complexity_file,  check.names = FALSE, row.names = 1, header = T, sep = "\t")
+jaccard_df       <- read.table(jaccard_file,     check.names = FALSE, row.names = 1, header = T, sep = "\t")
+degradation_df   <- read.table(degradation_file, check.names = FALSE, row.names = 1, header = T, sep = "\t")
+genebodycov_df   <- read.table(genebodycov_file, check.names = FALSE, row.names = 1, header = T, sep = "\t")
+pca_df           <- read.table(pca_file,         check.names = FALSE, row.names = 2, header = T, sep = "\t")
+pca_data_df      <- read.table(pca_data_file,    check.names = FALSE, row.names = 1, header = T, sep = "\t")
+g_detect_df      <- read.table(g_detect_file,    check.names = FALSE, row.names = 1, header = T, sep = "\t")
+g_vst_df         <- read.table(g_vst_file,       check.names = FALSE, row.names = 1, header = T, sep = "\t")
+size_factor_df   <- read.table(size_factor_file, check.names = FALSE, row.names = 1, header = T, sep = "\t")
+dispersion_df    <- read.table(dispersion_file,  check.names = FALSE, row.names = 1, header = T, sep = "\t")
+lib_type_df      <- read.table(lib_type_file,    check.names = FALSE, row.names = 1, header = T, sep = "\t")
+frag_len_df      <- read.table(frag_len_file,    check.names = FALSE, row.names = 1, header = T, sep = "\t")
 
 samples_df       <- samples_df[order(rownames(samples_df)),]
 
@@ -266,15 +266,6 @@ datatable(metric_df, options = list(pageLength = 50)) |> formatRound(columns = c
 ### **Gene Detection**
 
 ```{r gene detection}
-## g_detect_plot <- g_detect_df |> 
-##     dplyr::filter(transcripts %in% seq(0, nrow(g_detect_df), 10)) |> 
-##     pivot_longer(-transcripts)
-
-## g_detect_plot$condition <- samples_df[g_detect_plot$name,,drop=FALSE]$condition
-## g_detect_plot$entropy <- complexity_df[g_detect_plot$name,]$shannon_entropy
-
-## ggplotly(ggplot(g_detect_plot, aes(x=transcripts, y=value, group=name, col=entropy)) +
-##          xlab("Number of Transcripts") + ylab("% Reads") + geom_line())
 g_detect_plot <- g_detect_df |> mutate(fraction=rownames(g_detect_df)) |> pivot_longer(-fraction)
 
 g_detect_plot$condition <- samples_df[g_detect_plot$name,,drop=FALSE]$condition
@@ -428,24 +419,6 @@ ggplotly(ggplot(pcm, aes(x = value, y = rot, label=sample)) + geom_boxplot() + g
          facet_grid(PC~name, scale = "free_x") + xlab("") + ylab("") + 
          theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)))
 ```
-
-
-
-<!-- ### PCA Outlier -->
-
-<!-- ```{r PCA outlier} -->
-<!-- pca_data_df[sample_names,] |> rownames_to_column("sample") |>  -->
-<!--   mutate(condition=samples_df[sample_names,,drop=FALSE]$condition,  -->
-<!--          is_outlier=pca_df[sample_names,]$is_outlier,  -->
-<!--          outlier=pca_df[sample_names,]$norm_influence) |>  -->
-<!--   pivot_longer(-c(sample, condition, outlier, is_outlier)) -> pca_plot_df -->
-
-
-<!-- ggplotly(ggplot(pca_plot_df, aes(x=condition, y=value, label=sample)) + geom_boxplot() +  -->
-<!--   geom_point(data=pca_plot_df[pca_plot_df$is_outlier,], col="red") +  -->
-<!--   facet_wrap(~name, nrow=1) +  -->
-<!--   theme(axis.text.x = element_text(angle = 90, hjust = 0))) -->
-<!-- ``` -->
 
 
 
