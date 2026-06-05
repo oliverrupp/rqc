@@ -243,6 +243,27 @@ compute_gene_detection <- function() {
 
 
 
+##################### READS TO GENES ##########################################
+reads_to_genes <- function() {
+    prj_message("READS TO GENES", 3)
+
+    fractions <- seq(0, 1, by = 0.01)
+
+    gene_detection_curve <- function(counts) {
+        sapply(fractions, function(f) { 
+            sum(1 - (1 - f)^counts)
+        })
+    }
+
+    reads_to_genes <<- apply(g_count_matrix, 2, gene_detection_curve)
+
+    write_tsv(reads_to_genes, "reads_to_genes")
+}
+##################### READS TO GENES ##########################################
+
+
+
+
 
 ##################### LIB COMPLEXITY ##########################################
 library_complexity <- function() {
@@ -650,6 +671,7 @@ get_counts_from_salmon()
 ### complexity ####
 compute_gene_detection()
 library_complexity()
+reads_to_genes()
 get_saturation()
 read_mapping()
 

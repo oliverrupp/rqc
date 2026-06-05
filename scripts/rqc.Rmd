@@ -32,7 +32,7 @@ degradation_file <- paste0(prj_dir, "/tsv/", data_dir, "/coverage_skewness.tsv")
 genebodycov_file <- paste0(prj_dir, "/tsv/", data_dir, "/gene_body_coverage.tsv")
 pca_file         <- paste0(prj_dir, "/tsv/", data_dir, "/pca_outlier.tsv")
 pca_data_file    <- paste0(prj_dir, "/tsv/", data_dir, "/pca.tsv")
-g_detect_file    <- paste0(prj_dir, "/tsv/", data_dir, "/gene_detection.tsv")
+g_detect_file    <- paste0(prj_dir, "/tsv/", data_dir, "/reads_to_genes.tsv")
 g_vst_file       <- paste0(prj_dir, "/tsv/", data_dir, "/g_vst.tsv")
 size_factor_file <- paste0(prj_dir, "/tsv/", data_dir, "/size_factor_qc.tsv")
 dispersion_file  <- paste0(prj_dir, "/tsv/", data_dir, "/g_dispersion.tsv")
@@ -250,15 +250,23 @@ datatable(metric_df, options = list(pageLength = 50)) |> formatRound(columns = c
 ### **Gene Detection**
 
 ```{r gene detection}
-g_detect_plot <- g_detect_df |> 
-    dplyr::filter(transcripts %in% seq(0, nrow(g_detect_df), 10)) |> 
-    pivot_longer(-transcripts)
+## g_detect_plot <- g_detect_df |> 
+##     dplyr::filter(transcripts %in% seq(0, nrow(g_detect_df), 10)) |> 
+##     pivot_longer(-transcripts)
+
+## g_detect_plot$condition <- samples_df[g_detect_plot$name,,drop=FALSE]$condition
+## g_detect_plot$entropy <- complexity_df[g_detect_plot$name,]$shannon_entropy
+
+## ggplotly(ggplot(g_detect_plot, aes(x=transcripts, y=value, group=name, col=entropy)) +
+##          xlab("Number of Transcripts") + ylab("% Reads") + geom_line())
+g_detect_plot <- g_detect_df |> mutate(fraction=rownames(g_detect_df)) |> pivot_longer(-fraction)
 
 g_detect_plot$condition <- samples_df[g_detect_plot$name,,drop=FALSE]$condition
-g_detect_plot$entropy <- complexity_df[g_detect_plot$name,]$shannon_entropy
+g_detect_plot$effective_gene_count <- exp(complexity_df[g_detect_plot$name,]$shannon_entropy)
+g_detect_plot$fraction = as.numeric(g_detect_plot$fraction) - 1
 
-ggplotly(ggplot(g_detect_plot, aes(x=transcripts, y=value, group=name, col=entropy)) +
-         xlab("Number of Transcripts") + ylab("% Reads") + geom_line())
+ggplotly(ggplot(g_detect_plot, aes(x=fraction, y=value, group=name, col=effective_gene_count)) +
+           xlab("Read Fraction [%]") + ylab("Detected transcripts") + geom_line())
 ```
 
 
