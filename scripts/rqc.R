@@ -281,6 +281,44 @@ library_complexity <- function() {
 
 
 
+##################### JACCARD TOP 1000 #########################################
+jaccard_similarity <- function() {
+    top_genes <- apply(g_count_matrix, 2, function(x) {
+        names(sort(x, decreasing=TRUE)[1:1000])
+    })
+
+    samples <- colnames(top_genes)
+
+    jaccard_mat <- matrix(
+        NA,
+        nrow = length(samples),
+        ncol = length(samples),
+        dimnames = list(samples, samples)
+    )
+
+    for(i in seq_along(samples)) {
+        for(j in seq_along(samples)) {
+            
+            a <- top_genes[,i]
+            b <- top_genes[,j]
+    
+            intersection <- length(intersect(a, b))
+            union <- length(union(a,b))
+    
+            jaccard_mat[i,j] <- intersection / union
+        }
+    }
+
+    jaccard_df <<- as.data.frame(jaccard_mat)
+
+    write_tsv(jaccard_df, "jaccard")
+}
+
+
+###############################################################################
+
+
+
 
 ##################### SATURATION ##############################################
 get_saturation <- function() {
@@ -674,6 +712,7 @@ library_complexity()
 reads_to_genes()
 get_saturation()
 read_mapping()
+jaccard_similarity()
 
 complexity_df <<- cbind(read_mapping_df, top_x_transcripts, shannon_entropy)
 

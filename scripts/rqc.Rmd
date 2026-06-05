@@ -28,6 +28,7 @@ falco_folder     <- paste0(prj_dir, "/results/falco")
 
 condition_file   <- paste0(prj_dir, "/tsv/", data_dir, "/condition_df.tsv")
 complexity_file  <- paste0(prj_dir, "/tsv/", data_dir, "/complexity.tsv")
+jaccard_file     <- paste0(prj_dir, "/tsv/", data_dir, "/jaccard.tsv")
 degradation_file <- paste0(prj_dir, "/tsv/", data_dir, "/coverage_skewness.tsv")
 genebodycov_file <- paste0(prj_dir, "/tsv/", data_dir, "/gene_body_coverage.tsv")
 pca_file         <- paste0(prj_dir, "/tsv/", data_dir, "/pca_outlier.tsv")
@@ -41,6 +42,7 @@ lib_type_file    <- paste0(prj_dir, "/tsv/", data_dir, "/lib_type.tsv")
 samples_df       <- read.table(samples_file, header = T, sep = "\t") |> column_to_rownames("sample")
 condition_df     <- read.table(condition_file, row.names = 1, header = T, sep = "\t")
 complexity_df    <- read.table(complexity_file, row.names = 1, header = T, sep = "\t")
+jaccard_df       <- read.table(jaccard_file, row.names = 1, header = T, sep = "\t")
 degradation_df   <- read.table(degradation_file, row.names = 1, header = T, sep = "\t")
 genebodycov_df   <- read.table(genebodycov_file, row.names = 1, header = T, sep = "\t")
 pca_df           <- read.table(pca_file, row.names = 2, header = T, sep = "\t")
@@ -243,7 +245,7 @@ metric_df <- complexity_df |>
     mutate(condition=samples_df[rownames(complexity_df),,drop=FALSE]$condition,
            lib_orientation=map_lib_type(lib_type_df[rownames(complexity_df),,drop=FALSE]$lib_type),
            lib_type=lib_type_df[rownames(complexity_df),,drop=FALSE]$e_type,
-           detected_genes=as.integer(unname(g_detect_df[101,rownames(complexity_df),drop=TRUE])),
+           detected_genes=as.integer(g_detect_df[101,rownames(complexity_df),drop=TRUE]),
            normalized_AUC=auc_norm[rownames(complexity_df)],
            effective_genes=exp(complexity_df$shannon_entropy),
            mapping_rate=Assigned/TotalReads*100) |> 
@@ -311,12 +313,30 @@ Column {.tabset}
 ### **Sample Correlation**
 
 ```{r correlation heatmap}
-sample_cor <- cor(g_vst_df, method = "pearson", use = "pairwise.complete.obs")
+gene_variance <- apply(g_vst_df, 1, var)
+top_v_genes <- order(gene_variance, decreasing = TRUE)[1:5000]
+
+sample_cor <- cor(g_vst_df[top_v_genes,], method = "pearson", use = "pairwise.complete.obs")
 heatmaply(sample_cor,
           row_side_colors = samples_df,
           col_side_colors = samples_df,
           colors = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(100))
 ```
+
+
+### **Top 1000 Genes**
+
+```{r jaccard heatmap}
+jhm <- heatmaply(jaccard_df,
+          row_side_colors = samples_df[rownames(jaccard_df),],
+          col_side_colors = samples_df[rownames(jaccard_df),],
+          colors = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(300),
+          dendrogram = "none",
+          scale = "none")
+jhm$x$layout$showlegend <- FALSE
+jhm
+```
+
 
 
 ### **PCA**
