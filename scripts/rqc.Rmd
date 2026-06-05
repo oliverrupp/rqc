@@ -327,9 +327,11 @@ heatmaply(sample_cor,
 ### **Top 1000 Genes**
 
 ```{r jaccard heatmap}
+jaccard_df <- jaccard_df[order(rownames(jaccard_df)),order(colnames(jaccard_df))]
+
 jhm <- heatmaply(jaccard_df,
           row_side_colors = samples_df[rownames(jaccard_df),],
-          col_side_colors = samples_df[rownames(jaccard_df),],
+          col_side_colors = samples_df[colnames(jaccard_df),],
           colors = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(300),
           dendrogram = "none",
           scale = "none")

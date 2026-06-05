@@ -24,15 +24,30 @@ suppressMessages(library(GGally))
 init_project <- function() {
     message(" == INIT")
 
+    script_dir <<- if (exists("snakemake")) {
+                       normalizePath(snakemake@scriptdir)
+                   } else if (rstudioapi::isAvailable()) {
+                       dirname(normalizePath(rstudioapi::getActiveDocumentContext()$path))
+                   } else {
+                       dirname(normalizePath(commandArgs(trailingOnly = FALSE) |>
+                                             grep("--file=", x = _, value = TRUE) |>
+                                             sub("--file=", "", x = _)))
+                   }
+    
     spec <- matrix(c(
         "datafolder", "d", 1, "character",
         "samples", "s", 1, "character",
+        "no_plot", "n", 0, "logical",
         "help", "h", 0, "logical"
     ), byrow = TRUE, ncol = 4)
     opt <- getopt(spec)
 
     samples_file <<- NULL
 
+    do_render_html <<- TRUE
+
+    if(!is.null(opt$no_plot)) do_render_html <<- FALSE
+    
     if (exists("snakemake")) {
         samples_file <<- normalizePath(snakemake@input[["samples"]], mustWork = TRUE)
         setwd(dirname(snakemake@output[["report"]]))
@@ -661,17 +676,8 @@ write_tsv <- function(df, file) {
 render_html <- function() {
     prj_message("RENDER HTML", 3)
 
-    script_dir <- if (exists("snakemake")) {
-                      snakemake@scriptdir
-                  } else if (rstudioapi::isAvailable()) {
-                      dirname(rstudioapi::getActiveDocumentContext()$path)
-                  } else {
-                      dirname(normalizePath(commandArgs(trailingOnly = FALSE) |>
-                                            grep("--file=", x = _, value = TRUE) |>
-                                            sub("--file=", "", x = _)))
-                  }
-    
     template <- paste0(script_dir, "/rqc.Rmd")
+    prj_message(template, 4)
     
     if(!dir.exists(paste0(getwd(), "/report"))) dir.create(paste0(getwd(), "/report"), recursive = TRUE)
 
@@ -733,7 +739,8 @@ size_factor_qc()
 ### size factor ####
 
 ### render HTML ####
-render_html()
+if(do_render_html)
+    render_html()
 ### render HTML ####
 
 prj_message("DONE", 2)
