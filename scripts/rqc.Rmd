@@ -241,7 +241,7 @@ map_lib_type <- function(libtype) {
 
 fractions <- seq(0, 1, by = 0.01)
 
-auc_norm <- apply(g_detect_df, 2, function(y) {
+auc_norm <- apply(g_detect_df, 2, \(y) {
   trapz(fractions, y / max(y))
 })
 
@@ -619,7 +619,7 @@ cat("\n\n### **Per base sequence quality**\n\n")
 
 
 ```{r Per base sequence quality, eval=has_falco}
-pbq_df <- map_dfr(names(falco_data), function(s) {
+pbq_df <- map_dfr(names(falco_data), \(s) {
     sec <- falco_data[[s]][["Per base sequence quality"]]; if(is.null(sec)) return(NULL)
     df  <- parse_table(sec); if(is.null(df)) return(NULL)
     df$Sample <- s; df
@@ -630,6 +630,8 @@ pbq_df <- update_samples(pbq_df)
 ggplotly(ggplot(pbq_df, aes(x=Base, y=Median, group=Sample, col=Sample)) + geom_line() + facet_wrap(~read))
 ```
 
+
+
 ```{r falco2, results='asis', echo=FALSE, eval=has_falco}
 cat("\n\n### **Per-sequence quality**\n\n")
 ```
@@ -637,7 +639,7 @@ cat("\n\n### **Per-sequence quality**\n\n")
 
 
 ```{r per sequence quality, eval=has_falco}
-psq_df <- map_dfr(names(falco_data), function(s) {
+psq_df <- map_dfr(names(falco_data), \(s) {
     sec <- falco_data[[s]][["Per sequence quality scores"]]; if(is.null(sec)) return(NULL)
     df  <- parse_table(sec); if(is.null(df)) return(NULL)
     df$Sample <- s; df
@@ -648,6 +650,8 @@ psq_df <- update_samples(psq_df)
 ggplotly(ggplot(psq_df, aes(x=Quality, y=Count, col=Sample)) + geom_line() + facet_wrap(~read))
 ```
 
+
+
 ```{r falco3, results='asis', echo=FALSE, eval=has_falco}
 cat("\n\n### **Adapter content**\n\n")
 ```
@@ -655,7 +659,7 @@ cat("\n\n### **Adapter content**\n\n")
 
 
 ```{r adapter content, eval=has_falco}
-ac_df <- map_dfr(names(falco_data), function(s) {
+ac_df <- map_dfr(names(falco_data), \(s) {
     sec <- falco_data[[s]][["Adapter Content"]]; if(is.null(sec)) return(NULL)
     df  <- parse_table(sec); if(is.null(df)) return(NULL)
     df$Sample <- s; df
@@ -682,17 +686,14 @@ cat("Benchmarks\n=====================================\nColumn\n----------------
 
 ```{r benchmarks, eval=has_benchmark}
 files <- list.files(benchmark_folder, pattern = "\\.txt$", full.names = TRUE)
+library(dplyr)
 
-bench_df <- map_dfr(files, function(f) {
-    nm <- basename(f) |> str_remove("\\.txt$")
-    parts <- str_split(nm, "\\.", simplify = TRUE)
-    
-    rule <- parts[1]
-    wildcard <- paste(parts[-1], collapse = ".")
-    
-    read_tsv(f, show_col_types = FALSE) |>
-        mutate(rule = rule, wildcard = wildcard, file = basename(f))
-})
+bench_df <- bind_rows(
+    lapply(files, \(f) {
+        cbind(read.delim(f, check.names = FALSE, stringsAsFactors = FALSE), file = basename(f))
+    })) |> mutate(stem = tools::file_path_sans_ext(file),
+                  rule = sub("\\..*", "", stem),
+                  wildcard = sub("^[^.]+\\.?", "", stem)) |> select(-stem) 
 
 ## only available with `snakemake --benchmark-extended` 
 if(! "threads" %in% names(bench_df)) { bench_df$threads <- 0 } 
