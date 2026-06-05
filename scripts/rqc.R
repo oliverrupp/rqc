@@ -248,8 +248,7 @@ get_counts_from_salmon <- function() {
     frag_est <- (tx_lengths[long_tx] - length_mat[long_tx, ] + 1) |>
       colMeans(na.rm = TRUE) |>
       as.data.frame() |>
-      setNames("mean_frag_est") |>
-      rownames_to_column("sample")
+      setNames("mean_frag_est") 
     write_tsv(frag_est, "fragment_length")
     
     for(cnts in c("count_matrix", "TPM", "TMM", "geTMM", "vst", "dispersion")) {

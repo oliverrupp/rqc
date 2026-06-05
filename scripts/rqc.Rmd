@@ -154,7 +154,7 @@ Library complexity is measured here as the percentage of reads assigned to the 1
 
 Low complexity can result from several factors, including overrepresentation of a small number of transcripts, rRNA contamination, poor RNA quality, or technical issues during library preparation.
 
-The **Complexity** page provides additional metrics that help identify the underlying cause of low complexity.
+The **Library** page provides additional metrics that help identify the underlying cause of low complexity.
 
   &nbsp;
 
@@ -164,7 +164,7 @@ RNA degradation prior to library preparation can introduce systematic biases int
 
 In high-quality libraries, read coverage is expected to be approximately uniform across the gene body. To assess degradation, the pipeline calculates the gene body coverage bias. Negative values indicate a 5′ bias, positive values indicate a 3′ bias, and values close to zero are expected for libraries with little or no degradation.
 
-The **Degradation** page provides detailed gene body coverage profiles for each sample.
+The **RNA Degradation** page provides detailed gene body coverage profiles for each sample.
 
   &nbsp;
 
@@ -182,7 +182,7 @@ The **PCA** page contains both the sample correlation heatmap and PCA plots, whi
 
 
 
-Complexity
+Library
 =====================================
 
 Column {.tabset}
@@ -252,11 +252,12 @@ metric_df <- complexity_df |>
            detected_genes=as.integer(g_detect_df[101,rownames(complexity_df),drop=TRUE]),
            normalized_AUC=auc_norm[rownames(complexity_df)],
            effective_genes=exp(complexity_df$shannon_entropy),
+           fragment_length=as.numeric(frag_len_df[rownames(complexity_df),,drop=FALSE]$mean_frag_est),
            mapping_rate=Assigned/TotalReads*100) |> 
-    dplyr::select("condition", "lib_type", "lib_orientation", "mapping_rate", "detected_genes",
+    dplyr::select("condition", "lib_type", "lib_orientation", "fragment_length", "mapping_rate", "detected_genes",
                   "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
                   "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
-column_names <- c("mapping_rate", "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
+column_names <- c("fragment_length", "mapping_rate", "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
                   "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
 datatable(metric_df, options = list(pageLength = 50)) |> formatRound(columns = column_names, digits = 2)
 ```
@@ -285,7 +286,7 @@ ggplotly(ggplot(g_detect_plot, aes(x=fraction, y=value, group=name, col=effectiv
 ```
 
 
-Degradation
+RNA Degradation
 =====================================
 
 Column {.tabset}
@@ -314,12 +315,8 @@ gb_cov_hm
 ### **Fragment Length Estimation**
 
 ```{r fragment length}
-ggplotly(ggplot(frag_len_df, aes(x = reorder(sample, mean_frag_est), y = mean_frag_est)) +
-  geom_point() +
-  coord_flip() +
-  labs(
-    y = "Mean estimated fragment length (bp)",
-  ))
+ggplotly(ggplot(frag_len_df |> as.data.frame() |> rownames_to_column("sample"), aes(x = reorder(sample, mean_frag_est), y = mean_frag_est)) +
+  geom_point() + coord_flip() + labs(y = "Mean estimated fragment length (bp)"))
 ```
 
 
