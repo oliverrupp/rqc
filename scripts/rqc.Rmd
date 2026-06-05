@@ -247,17 +247,16 @@ auc_norm <- apply(g_detect_df, 2, \(y) {
 
 metric_df <- complexity_df |> 
     mutate(condition=samples_df[rownames(complexity_df),,drop=FALSE]$condition,
-           lib_orientation=map_lib_type(lib_type_df[rownames(complexity_df),,drop=FALSE]$lib_type),
-           lib_type=lib_type_df[rownames(complexity_df),,drop=FALSE]$e_type,
+           orientation=map_lib_type(lib_type_df[rownames(complexity_df),,drop=FALSE]$lib_type),
+           type=lib_type_df[rownames(complexity_df),,drop=FALSE]$e_type,
            detected_genes=as.integer(g_detect_df[101,rownames(complexity_df),drop=TRUE]),
            normalized_AUC=auc_norm[rownames(complexity_df)],
            effective_genes=exp(complexity_df$shannon_entropy),
            fragment_length=as.numeric(frag_len_df[rownames(complexity_df),,drop=FALSE]$mean_frag_est),
            mapping_rate=Assigned/TotalReads*100) |> 
-    dplyr::select("condition", "lib_type", "lib_orientation", "fragment_length", "mapping_rate", "detected_genes",
-                  "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
-                  "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
-column_names <- c("fragment_length", "mapping_rate", "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
+    dplyr::select("condition", "type", "orientation", "fragment_length", "mapping_rate", "detected_genes",
+                  "top_100_transcripts", "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
+column_names <- c("fragment_length", "mapping_rate", "top_100_transcripts", 
                   "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
 datatable(metric_df, options = list(pageLength = 50)) |> formatRound(columns = column_names, digits = 2)
 ```
@@ -266,14 +265,25 @@ datatable(metric_df, options = list(pageLength = 50)) |> formatRound(columns = c
 ### **Gene Detection**
 
 ```{r gene detection}
+fractions <- seq(0, 1, by = 0.01)
+idx75 <- which.min(abs(fractions - 0.75))
+
+gain75 <- apply(g_detect_df, 2, \(y) {
+  (y[length(y)] - y[idx75]) / y[length(y)]
+}) * 1000
+
 g_detect_plot <- g_detect_df |> mutate(fraction=rownames(g_detect_df)) |> pivot_longer(-fraction)
 
 g_detect_plot$condition <- samples_df[g_detect_plot$name,,drop=FALSE]$condition
 g_detect_plot$effective_gene_count <- exp(complexity_df[g_detect_plot$name,]$shannon_entropy)
 g_detect_plot$fraction = as.numeric(g_detect_plot$fraction) - 1
 
+g_detect_plot <- g_detect_plot |> mutate(tail_gain=round(gain75[g_detect_plot$name]))
+
+g_detect_plot$tail_gain = factor(g_detect_plot$tail_gain, levels=sort(unique(g_detect_plot$tail_gain)))
+
 ggplotly(ggplot(g_detect_plot, aes(x=fraction, y=value, group=name, col=effective_gene_count)) +
-           xlab("Read Fraction [%]") + ylab("Detected transcripts") + geom_line())
+           xlab("Read Fraction [%]") + ylab("Detected transcripts") + geom_line() + facet_wrap(~tail_gain))
 ```
 
 
