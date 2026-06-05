@@ -112,7 +112,7 @@ for(coln in c("Condition", batch_cols)) {
 val_idx <- which(colnames(summary_df) %in% column_vals)
 target_idx <- which(colnames(summary_df) %in% column_names)
 
-dt <- datatable(summary_df,
+dt <- datatable(summary_df, class = "cell-border compact",
                 options = list(pageLength = 50,
                                columnDefs = list(list(visible = FALSE,
                                                       targets = val_idx)))) |>
@@ -233,16 +233,25 @@ map_lib_type <- function(libtype) {
     unname(paste0("[", libtype, "] ", salmon_library_type[libtype]))
 }
 
+fractions <- seq(0, 1, by = 0.01)
+
+auc_norm <- apply(g_detect_df, 2, function(y) {
+  trapz(fractions, y / max(y))
+})
+
 metric_df <- complexity_df |> 
     mutate(condition=samples_df[rownames(complexity_df),,drop=FALSE]$condition,
            lib_orientation=map_lib_type(lib_type_df[rownames(complexity_df),,drop=FALSE]$lib_type),
            lib_type=lib_type_df[rownames(complexity_df),,drop=FALSE]$e_type,
+           detected_genes=as.integer(unname(g_detect_df[101,rownames(complexity_df),drop=TRUE])),
+           normalized_AUC=auc_norm[rownames(complexity_df)],
+           effective_genes=exp(complexity_df$shannon_entropy),
            mapping_rate=Assigned/TotalReads*100) |> 
-    dplyr::select("condition", "lib_type", "lib_orientation", "mapping_rate",
+    dplyr::select("condition", "lib_type", "lib_orientation", "mapping_rate", "detected_genes",
                   "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
-                  "Duprate", "shannon_entropy")
+                  "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
 column_names <- c("mapping_rate", "top_10_transcripts",  "top_50_transcripts", "top_100_transcripts", 
-                  "Duprate", "shannon_entropy")
+                  "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
 datatable(metric_df, options = list(pageLength = 50)) |> formatRound(columns = column_names, digits = 2)
 ```
 

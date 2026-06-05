@@ -6,7 +6,7 @@ suppressMessages(library(heatmaply))
 suppressMessages(library(RColorBrewer))
 suppressMessages(library(GGally))
 suppressMessages(library(jsonlite))
-
+suppressMessages(library(pracma))
 
 
 script_dir <- if (exists("snakemake")) {
