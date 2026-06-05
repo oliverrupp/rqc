@@ -38,6 +38,7 @@ g_vst_file       <- paste0(prj_dir, "/tsv/", data_dir, "/g_vst.tsv")
 size_factor_file <- paste0(prj_dir, "/tsv/", data_dir, "/size_factor_qc.tsv")
 dispersion_file  <- paste0(prj_dir, "/tsv/", data_dir, "/g_dispersion.tsv")
 lib_type_file    <- paste0(prj_dir, "/tsv/", data_dir, "/lib_type.tsv")
+frag_len_file    <- paste0(prj_dir, "/tsv/", data_dir, "/fragment_length.tsv")
 
 samples_df       <- read.table(samples_file, header = T, sep = "\t") |> column_to_rownames("sample")
 condition_df     <- read.table(condition_file, row.names = 1, header = T, sep = "\t")
@@ -52,6 +53,9 @@ g_vst_df         <- read.table(g_vst_file, row.names = 1, header = T, sep = "\t"
 size_factor_df   <- read.table(size_factor_file, row.names = 1, header = T, sep = "\t")
 dispersion_df    <- read.table(dispersion_file, row.names = 1, header = T, sep = "\t")
 lib_type_df      <- read.table(lib_type_file, row.names = 1, header = T, sep = "\t")
+frag_len_df      <- read.table(frag_len_file, row.names = 1, header = T, sep = "\t")
+
+samples_df       <- samples_df[order(rownames(samples_df)),]
 
 sample_names     <- rownames(samples_df)
 
@@ -284,12 +288,16 @@ ggplotly(ggplot(g_detect_plot, aes(x=fraction, y=value, group=name, col=effectiv
 Degradation
 =====================================
 
+Column {.tabset}
+-------------------------------------
+
+
 ### **Genebody Coverage**
 
 ```{r genebody coverage}
 genebodycov_df <- genebodycov_df[rev(rownames(degradation_df[order(degradation_df$skewness,rownames(degradation_df)),,drop=FALSE])),]
 
-rsc <- samples_df |> mutate(degradation = as.integer(summary_df[rownames(samples_df),]$Degradation))
+rsc <- samples_df |> mutate(degradation = as.integer(summary_df[rownames(genebodycov_df),]$Degradation))
 
 gb_cov_hm <- heatmaply(genebodycov_df, 
                        dendrogram = "none",
@@ -300,6 +308,18 @@ gb_cov_hm <- heatmaply(genebodycov_df,
                                   colorRampPalette(c("#A50026", "#800080"))(200)))
 gb_cov_hm$x$layout$showlegend <- FALSE
 gb_cov_hm
+```
+
+
+### **Fragment Length Estimation**
+
+```{r fragment length}
+ggplotly(ggplot(frag_len_df, aes(x = reorder(sample, mean_frag_est), y = mean_frag_est)) +
+  geom_point() +
+  coord_flip() +
+  labs(
+    y = "Mean estimated fragment length (bp)",
+  ))
 ```
 
 

@@ -15,6 +15,8 @@ suppressMessages(library(plotly))
 suppressMessages(library(heatmaply))
 suppressMessages(library(RColorBrewer))
 suppressMessages(library(GGally))
+suppressMessages(library(Biostrings))
+
 
 
 
@@ -107,10 +109,11 @@ get_counts_from_salmon <- function() {
 #### tximeta ####
     prj_message("tximeta", 4)
     suppressMessages({
-        bcf_dir    <- file.path(getwd(), "results/index/BFC")
-        index_dir  <- file.path(getwd(), "results/index/salmon")
-        fasta_path <- file.path(getwd(), "reference/genome.fa")
-        gtf_path   <- file.path(getwd(), "reference/annotation.gtf")
+        bcf_dir      <- file.path(getwd(), "results/index/BFC")
+        index_dir    <- file.path(getwd(), "results/index/salmon")
+        fasta_path   <- file.path(getwd(), "reference/genome.fa")
+        t_fasta_path <- file.path(getwd(), "reference/transcripts.fa")
+        gtf_path     <- file.path(getwd(), "reference/annotation.gtf")
         
         if (!dir.exists(bcf_dir)) {
             dir.create(bcf_dir)
@@ -124,11 +127,17 @@ get_counts_from_salmon <- function() {
                         genome   = getwd(),
                         fasta    = fasta_path,
                         gtf      = gtf_path)
+
+        fa <- readDNAStringSet(t_fasta_path)
+        names(fa) <- sub(" .*", "", names(fa))
+                
+        t_se <<- tximeta(sample_info)
+        rowData(t_se)$length <<- width(fa)[match(rownames(t_se), names(fa))]
         
-        t_se <- tximeta(sample_info)
-        g_se <- summarizeToGene(t_se)
+        g_se <<- summarizeToGene(t_se)
         
         t_count_matrix <<- assay(t_se, "counts")
+        
         g_count_matrix <<- assay(g_se, "counts")
 
         check <- unlock(mtx)
@@ -207,6 +216,8 @@ get_counts_from_salmon <- function() {
             t_dispersion <<- data.frame(mean = 0, geneEst = 0, fit = 0, final = 0)
         }
 
+        g_dds <<- g_dds
+        t_dds <<- t_dds
                                         # blind = TRUE if no replicates!
         t_vsd <- vst(t_dds, blind = sum(replicate_counts$number > 1) == 0) 
         t_vst <<- assay(t_vsd)
@@ -222,11 +233,25 @@ get_counts_from_salmon <- function() {
     })
 #### DESeq2 ####
 
-####n correlation ####
+#### correlation ####
     g_sample_correlation <- cor(g_vst, method = "pearson", use = "pairwise.complete.obs")
     g_sample_dist <- as.matrix(dist(t(g_vst)))
 #### correlation ####
 
+
+#### fragment size
+    length_mat    <- assay(t_se, "length")      # effective lengths, transcripts × samples
+    tx_lengths    <- rowData(t_se)$length       # raw transcript lengths, one per tx
+    
+    long_tx <- tx_lengths > 500
+
+    frag_est <- (tx_lengths[long_tx] - length_mat[long_tx, ] + 1) |>
+      colMeans(na.rm = TRUE) |>
+      as.data.frame() |>
+      setNames("mean_frag_est") |>
+      rownames_to_column("sample")
+    write_tsv(frag_est, "fragment_length")
+    
     for(cnts in c("count_matrix", "TPM", "TMM", "geTMM", "vst", "dispersion")) {
         for(ref in c("t", "g")) {
             v <- paste0(ref, "_", cnts)
@@ -625,7 +650,7 @@ condition_pca <- function() {
 size_factor_qc <- function() {
     prj_message("SIZE FACTORS", 3)
 
-                                        # https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html
+### https://www.bioconductor.org/packages/release/bioc/vignettes/DEGreport/inst/doc/DEGreport.html
 
     geoMeanNZ <- function(x) {
         if (all(x == 0)) { 0 }
@@ -712,6 +737,7 @@ read_sample_info()
 get_counts_from_salmon()
 ### read results ####
 
+
 ### complexity ####
 compute_gene_detection()
 library_complexity()
@@ -744,4 +770,5 @@ if(do_render_html)
 ### render HTML ####
 
 prj_message("DONE", 2)
+
 
