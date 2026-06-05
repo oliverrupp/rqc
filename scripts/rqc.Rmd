@@ -55,7 +55,12 @@ sample_names     <- rownames(samples_df)
 
 pca_df$norm_influence <- pca_df[sample_names,,drop=FALSE]$influence/pca_df[sample_names,,drop=FALSE]$cutoff
 
-gradient <- colorRampPalette(c("#2ecc71", "#f1c40f", "#e74c3c"))(100)
+#gradient <- colorRampPalette(c("#2ecc71", "#f1c40f", "#e74c3c"))(100)
+#gradient <- colorRampPalette(c("#2166AC", "#74ADD1", "#E0F3F8", "#FFFFBF", "#FEE090", "#F46D43", "#A50026"))(100)
+#gradient <- colorRampPalette(rev(brewer.pal(11, "RdYlBu")))(100)
+#gradient <- colorRampPalette(c("#8B0000", "#B71C1C", "#C84B1E", "#B5620A", "#7A6000", "#5A5000", "#2C6E8A", "#1A5E7A", "#1B4F86", "#1A3A7A", "#0D2161"))(100)
+#gradient <- colorRampPalette(c("#1B4F72", "#1A6B8A", "#0F7B6C", "#2D6A4F", "#3D405B", "#6B3A2A", "#8B4513", "#A0522D", "#922B21", "#7B241C"))(100)
+gradient <- colorRampPalette(c("#99DDD8", "#B2E8E8", "#CCF0EC", "#E8F8E8", "#F5F5E8", "#FDF0B0", "#FADA7A", "#F5BF6A", "#F0A07A", "#E8846A", "#E06858"))(100)
 
 summary_df <- samples_df
 
@@ -115,7 +120,7 @@ dt <- datatable(summary_df,
 
 for(coln in column_names) {
     dt <- dt |> formatStyle(coln, fontWeight = "bold") |> 
-        formatStyle(coln, fontWeight="bold", color="white", 
+        formatStyle(coln, fontWeight="bold", color="black", 
                     valueColumns = paste0(coln, "_val"), 
                     background = styleInterval(seq(0, ifelse(coln == "Complexity", 50, ifelse(coln == "Degradation", 2, 100)), length.out = 99), gradient))
 }
