@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ENV_NAME="rqc"
+
+# Absolute path of this script's directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Environment definition
+ENV_YAML="${SCRIPT_DIR}/envs/rqc.yaml"
+
+###############################################################################
+# Check Conda installation
+###############################################################################
+
+if ! command -v conda >/dev/null 2>&1; then
+    echo "ERROR: Conda is not installed or not available in PATH." >&2
+    exit 1
+fi
+
+CONDA_BASE="$(conda info --base 2>/dev/null)" || {
+    echo "ERROR: Unable to determine Conda base directory." >&2
+    exit 1
+}
+
+CONDA_SH="${CONDA_BASE}/etc/profile.d/conda.sh"
+
+if [[ ! -f "${CONDA_SH}" ]]; then
+    echo "ERROR: Conda activation script not found:" >&2
+    echo "       ${CONDA_SH}" >&2
+    exit 1
+fi
+
+source "${CONDA_SH}"
+
+###############################################################################
+# Check environment definition file
+###############################################################################
+
+if [[ ! -f "${ENV_YAML}" ]]; then
+    echo "ERROR: Environment file not found:" >&2
+    echo "       ${ENV_YAML}" >&2
+    exit 1
+fi
+
+###############################################################################
+# Create environment if missing
+###############################################################################
+
+if ! conda run -n "${ENV_NAME}" true >/dev/null 2>&1; then
+    echo "Conda environment '${ENV_NAME}' not found."
+    echo "Creating environment from:"
+    echo "  ${ENV_YAML}"
+
+    conda env create -f "${ENV_YAML}"
+
+    echo "Environment '${ENV_NAME}' created successfully."
+fi
+
+###############################################################################
+# Activate environment
+###############################################################################
+
+conda activate "${ENV_NAME}"
+
+###############################################################################
+# Check wrapper script
+###############################################################################
+
+RQC_PY="${SCRIPT_DIR}/rqc.py"
+
+if [[ ! -f "${RQC_PY}" ]]; then
+    echo "ERROR: Wrapper script not found:" >&2
+    echo "       ${RQC_PY}" >&2
+    exit 1
+fi
+
+###############################################################################
+# Run wrapper
+###############################################################################
+
+python "${RQC_PY}" "$@"
