@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-RNA Quality Control (RQC) Pipeline Wrapper
+RNA Quality Control (RQC)
 
 A Python wrapper script for running the Snakemake-based RQC pipeline.
 Handles input validation, configuration management, and Snakemake execution.
@@ -358,7 +358,7 @@ class RQCPipeline:
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="RNA Quality Control (RQC) Pipeline Wrapper",
+        description="RNA Quality Control (RQC) Pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

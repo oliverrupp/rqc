@@ -1,5 +1,6 @@
 name: rqc
 channels:
+  - conda-forge
   - bioconda
 dependencies:
   - snakemake
