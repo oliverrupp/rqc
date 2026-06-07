@@ -49,13 +49,25 @@ fi
 ###############################################################################
 
 if ! conda run -n "${ENV_NAME}" true >/dev/null 2>&1; then
-    echo "Conda environment '${ENV_NAME}' not found."
-    echo "Creating environment from:"
+    echo
+    echo "Conda environment '${ENV_NAME}' does not exist."
+    echo "Environment definition:"
     echo "  ${ENV_YAML}"
+    echo
 
-    conda env create -f "${ENV_YAML}"
+    read -r -p "Create environment '${ENV_NAME}' now? [y/N] " reply
 
-    echo "Environment '${ENV_NAME}' created successfully."
+    case "${reply}" in
+        [Yy]|[Yy][Ee][Ss])
+            echo "Creating environment..."
+            conda env create -f "${ENV_YAML}"
+            echo "Environment created successfully."
+            ;;
+        *)
+            echo "Aborted."
+            exit 1
+            ;;
+    esac
 fi
 
 ###############################################################################
