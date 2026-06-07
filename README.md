@@ -1,4 +1,4 @@
-# RNA Quality Control (RQC)
+# RNA Quality Control (RQC) Pipeline Wrapper
 
 A Python command-line tool that orchestrates the execution of the Snakemake-based RNA Quality Control (RQC) pipeline. This wrapper handles project validation, configuration management, and simplifies pipeline execution on both local machines and HPC clusters.
 
