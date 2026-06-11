@@ -4,3 +4,4 @@ channels:
   - bioconda
 dependencies:
   - snakemake
+  - snakemake-executor-plugin-slurm

@@ -40,7 +40,7 @@ dispersion_file  <- paste0(prj_dir, "/tsv/", data_dir, "/g_dispersion.tsv")
 lib_type_file    <- paste0(prj_dir, "/tsv/", data_dir, "/lib_type.tsv")
 frag_len_file    <- paste0(prj_dir, "/tsv/", data_dir, "/fragment_length.tsv")
 
-samples_df       <- read.table(samples_file,     check.names = FALSE, header = T, sep = "\t") |> column_to_rownames("sample")
+samples_df       <- read.table(samples_file,     check.names = FALSE, header = T, sep = "\t") |> column_to_rownames("sample") |> as.data.frame()
 condition_df     <- read.table(condition_file,   check.names = FALSE, row.names = 1, header = T, sep = "\t")
 complexity_df    <- read.table(complexity_file,  check.names = FALSE, row.names = 1, header = T, sep = "\t")
 jaccard_df       <- read.table(jaccard_file,     check.names = FALSE, row.names = 1, header = T, sep = "\t")
@@ -55,7 +55,7 @@ dispersion_df    <- read.table(dispersion_file,  check.names = FALSE, row.names 
 lib_type_df      <- read.table(lib_type_file,    check.names = FALSE, row.names = 1, header = T, sep = "\t")
 frag_len_df      <- read.table(frag_len_file,    check.names = FALSE, row.names = 1, header = T, sep = "\t")
 
-samples_df       <- samples_df[order(rownames(samples_df)),]
+samples_df       <- samples_df[order(rownames(samples_df)),,drop=F]
 
 sample_names     <- rownames(samples_df)
 
