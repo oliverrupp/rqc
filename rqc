@@ -77,6 +77,18 @@ fi
 conda activate "${ENV_NAME}"
 
 ###############################################################################
+# Check snakemake version
+###############################################################################
+
+SNMK_VERSION=$(snakemake --version)
+
+if [[ ! $SNMK_VERSION =~ ^9 ]]; then
+    echo "ERROR: Snakemake verion 9 needed, current version:" >&2
+    echo "       ${SNMK_VERSION}" >&2
+    exit 1
+fi
+
+###############################################################################
 # Check wrapper script
 ###############################################################################
 
