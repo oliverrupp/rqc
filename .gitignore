@@ -11,3 +11,4 @@ rqc.Rproj
 .venv
 .idea/
 .mypy_cache/
+slurm
