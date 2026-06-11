@@ -310,7 +310,7 @@ class RQCPipeline:
                 cmd.extend(["--profile", str(hpc_config)])
             
             # Add max-jobs for HPC execution
-            cmd.extend(["--max-jobs", str(max_jobs)])
+            cmd.extend(["--jobs", str(max_jobs)])
         else:  # local (default)
             cmd.extend(["--cores", str(max_cpus)])
         
