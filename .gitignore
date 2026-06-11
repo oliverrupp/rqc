@@ -8,3 +8,6 @@ rup2.Rproj
 data
 .positai
 rqc.Rproj
+.venv
+.idea/
+.mypy_cache/

@@ -16,7 +16,6 @@ Example:
 """
 
 import argparse
-import os
 import sys
 import psutil
 import subprocess
@@ -38,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 logging.addLevelName( logging.ERROR, "\033[1;31m%-8s\033[1;0m" % logging.getLevelName(logging.ERROR))
 logging.addLevelName( logging.WARNING, "\033[1;31m%-8s\033[1;0m" % logging.getLevelName(logging.WARNING))
- 
+
 class RQCValidator:
     """Validates project directory structure and input files."""
     
@@ -84,7 +83,7 @@ class RQCValidator:
                 if self._validate_organism(organism_path, verbose=verbose):
                     organisms.add(item.name)
                     if verbose:
-                        logger.info(f"valid organism")
+                        logger.info("valid organism")
         if verbose:
             print("")
         
@@ -121,31 +120,31 @@ class RQCValidator:
         
         if not reads_dir.exists() or not reads_dir.is_dir():
             if verbose:
-                logger.error(f"Missing reads directory")
+                logger.error("Missing reads directory")
             return False
 
         sample_files = self.get_sample_files(organism_path, verbose)
         
         if not sample_files:
             if verbose:
-                logger.error(f"No valid samples*.tsv files found")
+                logger.error("No valid samples*.tsv files found")
             return False
         
         # Check for at least one reads file
         reads_files = list(reads_dir.glob("*.fq.gz"))
         if not reads_files:
             if verbose:
-                logger.error(f"No .fq.gz files found")
+                logger.error("No .fq.gz files found")
             return False
                 
         return True
     
     def get_sample_names(self, organism: str) -> List[str]:
-        """Return sample TSV filenames for a organism."""
+        """Return sample TSV filenames for an organism."""
         return sorted(f.name for f in self.get_sample_files(self.project_dir / organism)
     )
 
-    def get_sample_files(self, organism_path: Path, verbose: bool = False) -> List[Path]:
+    def get_sample_files(self, organism_path: Path, verbose: bool = False) -> set[Path]:
         """Return all valid samples*.tsv files."""
         
         sample_files = sorted((organism_path / "reference").glob("samples*.tsv"))
@@ -159,7 +158,7 @@ class RQCValidator:
                 valid_samples.add(sample_file)
 
         if not valid_samples:
-            logger.error(f"No invalid sample file found")
+            logger.error("No invalid sample file found")
 
         return valid_samples
 
@@ -204,7 +203,8 @@ class RQCValidator:
 
         return result
 
-    def _validate_samples_tsv(self, samples_file: Path, verbose: bool = True) -> bool:
+    @staticmethod
+    def _validate_samples_tsv(samples_file: Path, verbose: bool = True) -> bool:
         """Validate samples.tsv has at least 'condition' and 'sample' columns."""
         try:
             with open(samples_file, 'r') as f:
@@ -255,7 +255,8 @@ class RQCPipeline:
         logger.info(f"Using HPC executor: {executor} ({self.SUPPORTED_EXECUTORS[executor]})")
         return True
     
-    def validate_hpc_config(self, hpc_config: Optional[Path]) -> bool:
+    @staticmethod
+    def validate_hpc_config(hpc_config: Optional[Path]) -> bool:
         """Validate that HPC config file exists if provided."""
         if hpc_config:
             if not hpc_config.exists():
@@ -302,7 +303,7 @@ class RQCPipeline:
         # Add execution mode
         if execution_mode == "hpc":
             # Snakemake 9 uses --executor option
-            cmd.extend(["--executor", executor])
+            cmd.extend(["--executor", str(executor)])
             
             # Add HPC config file (Snakemake profile)
             if hpc_config:
@@ -528,10 +529,8 @@ def list_organisms(project_dir: Path) -> int:
                 f"{sample_file}"
             )
     
-    max_required_mem_gb = max(
-        x["required_mem_gb"] for x in mem_info.values()
-    )
-
+    max_required_mem_gb = max(x["required_mem_gb"] for x in mem_info.values())
+    print(f'Maximum required memory: {max_required_mem_gb:5.2f} GB')
     print("-" * 70)
 
     return 0
@@ -555,7 +554,7 @@ def main():
     execution_mode = "hpc" if args.hpc else "local"
     use_conda = not args.no_conda 
     
-    logger.info(f"RNA Quality Control (RQC) Pipeline")
+    logger.info("RNA Quality Control (RQC) Pipeline")
     logger.info(f"Project directory: {project_dir}")
     logger.info(f"Execution mode: {execution_mode}")
     logger.info(f"Conda support: {use_conda}")
@@ -637,20 +636,20 @@ def main():
         logger.info("Running in DRY RUN mode - no jobs will be executed")
 
     if args.validate:
-        logger.info(f"validation OK")
+        logger.info("validation OK")
         print("\nWill execute:")
         print(f"{" ".join(cmd)}")
         sys.exit(0)
         
     logger.info("Starting pipeline execution...")
-    returncode = pipeline.run_snakemake(cmd)
+    returnee = pipeline.run_snakemake(cmd)
     
-    if returncode == 0:
+    if returnee == 0:
         logger.info("Pipeline execution completed successfully")
     else:
-        logger.error(f"Pipeline execution failed with return code {returncode}")
+        logger.error(f"Pipeline execution failed with return code {returnee}")
     
-    sys.exit(returncode)
+    sys.exit(returnee)
 
 
 if __name__ == "__main__":
