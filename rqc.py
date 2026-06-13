@@ -51,9 +51,11 @@ class RQCValidator:
         "reads/*_s.fq.gz"
     ]
     
-    def __init__(self, project_dir: Path):
+    def __init__(self, project_dir: Path, check_gtf: bool=True):
         self.project_dir = Path(project_dir).resolve()
-    
+        self.check_gtf = check_gtf
+        self.assemble_first = set()
+        
     def validate_project_structure(self) -> bool:
         """Validate main project directory exists."""
         if not self.project_dir.exists():
@@ -114,9 +116,14 @@ class RQCValidator:
             return False
         
         if not (annotation_gff3_file.exists() or annotation_gtf_file.exists()):
-            if verbose:
-                logger.error(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE}")
-            return False
+            if self.check_gtf:
+                if verbose:
+                    logger.error(f"Missing {self.REQUIRED_ANNOTATION_GFF3_FILE} and {self.REQUIRED_ANNOTATION_GTF_FILE}")
+                return False
+            else:
+                self.assemble_first.add(organism_path.name)
+                if verbose:
+                    logger.warning(f"Annotation file missing: will assemble RNA-seq reads!")
         
         if not reads_dir.exists() or not reads_dir.is_dir():
             if verbose:
@@ -275,6 +282,7 @@ class RQCPipeline:
         max_jobs: int,
         dry_run: bool,
         rerun_incomplete: bool,
+        do_assembly: bool,
         keep_going: bool,
         executor: Optional[str] = None,
         hpc_config: Optional[Path] = None,
@@ -320,7 +328,7 @@ class RQCPipeline:
         
         # Add dry run
         if dry_run:
-            cmd.append("--dry-run")
+            cmd.extend(["--dry-run", "--printshellcmds"])
 
         # Add rerun incomplete
         if rerun_incomplete:
@@ -335,7 +343,7 @@ class RQCPipeline:
             cmd.extend(["--configfile", str(config_file)])
 
         # Add targets
-        validator = RQCValidator(self.project_dir)
+        validator = RQCValidator(self.project_dir, do_assembly)
         targets = validator.get_report_targets(organisms)
         cmd.extend(targets)
         
@@ -392,6 +400,13 @@ Supported HPC executors:
         "--list-organisms",
         action="store_true",
         help="List all valid organisms and exit"
+    )
+
+    # force assembly if GTF is missing
+    parser.add_argument(
+        "--do-assembly",
+        action="store_true",
+        help="assemble reads if annotation.gtf is missing"
     )
     
     # HPC execution (optional - defaults to local if not specified)
@@ -484,9 +499,9 @@ Supported HPC executors:
     return parser.parse_args()
 
 
-def list_organisms(project_dir: Path) -> int:
+def list_organisms(project_dir: Path, do_assembly: bool=False) -> int:
     """List all valid organisms in the project directory."""
-    validator = RQCValidator(project_dir)
+    validator = RQCValidator(project_dir, not do_assembly)
 
     if not validator.validate_project_structure():
         logger.error("Project structure validation failed")
@@ -503,7 +518,8 @@ def list_organisms(project_dir: Path) -> int:
     print(f"\nValid organisms in {project_dir}:")
     print("-" * 70)
     print(
-        f"{'Organism':20s} "
+        f"{'Organism':11s} "
+        f"{'Assembly':9s} "
         f"{'Genome (GB)':>12s} "
         f"{'Mem. Req. (GB)':>15s} "
         f"Sample files"
@@ -514,8 +530,11 @@ def list_organisms(project_dir: Path) -> int:
         info = mem_info[organism]
         sample_files = validator.get_sample_names(organism)
 
+        assemble_first = "[assembly]" if organism in validator.assemble_first else ""
+        
         print(
-            f"{organism:20s} "
+            f"{organism:10s} "
+            f"{assemble_first:10s} "
             f"{info['genome_size_gb']:12.2f} "
             f"{info['required_mem_gb']:15.1f} "
             f"{sample_files[0]}"
@@ -526,7 +545,7 @@ def list_organisms(project_dir: Path) -> int:
                 f"{'':20s} "
                 f"{'':12s} "
                 f"{'':15s} "
-                f"{sample_file}"
+                f" {sample_file}"
             )
     
     max_required_mem_gb = max(x["required_mem_gb"] for x in mem_info.values())
@@ -548,7 +567,7 @@ def main():
     
     # Handle list-organisms option
     if args.list_organisms:
-        return list_organisms(project_dir)
+        return list_organisms(project_dir, args.do_assembly)
     
     # Determine execution mode (defaults to local if --hpc not specified)
     execution_mode = "hpc" if args.hpc else "local"
@@ -561,7 +580,7 @@ def main():
     
     # Validate project structure
     logger.info("Validating project structure...")
-    validator = RQCValidator(project_dir)
+    validator = RQCValidator(project_dir, not args.do_assembly)
     
     if not validator.validate_project_structure():
         logger.error("Project structure validation failed")
@@ -624,6 +643,7 @@ def main():
         max_jobs=args.max_jobs,
         dry_run=args.dry_run,
         rerun_incomplete=args.rerun_incomplete,
+        do_assembly=args.do_assembly,
         keep_going=args.keep_going,
         executor=args.hpc,
         hpc_config=args.hpc_config,

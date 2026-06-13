@@ -469,11 +469,23 @@ rule plant_bam:
 
   
 
+rule assemblies:
+    input: expand("{plant}/results/scallop.gtf", plant=PLANTS2)
+    output: ".assembly_done"
+    shell: """ touch {output} """
+
+
+
+rule gtf_from_reads:
+    input: "{plant}/results/scallop.gtf"
+    output: "{plant}/reference/annotation.gtf"
+    shell: """ cp {input} {output} """
+
+
 
 rule assembly:
     input:
         gtf=lambda wildcards: get_inputs(wildcards.plant, "gtf"),
-        reference="{plant}/reference/annotation.gtf"
     output: "{plant}/results/scallop.gtf"
     threads: 12
     benchmark: "{plant}/benchmark/stringtie_merge.txt"
@@ -484,7 +496,9 @@ rule assembly:
         cpus_per_task=12
     conda: "envs/scallop.yaml"
     shell: """
-           stringtie --merge -o {output} -G {input.reference} -p 12 --fr --conservative {input.gtf}
+           USEREF=""
+           [ -e "{wildcards.plant}/reference/annotation.gtf" ] && USEREF="-G {wildcards.plant}/reference/annotation.gtf"
+           stringtie --merge -o {output} $USEREF -p 12 --fr --conservative {input.gtf}
            """
 
 
@@ -581,7 +595,6 @@ rule scallop:
 rule star_index:
     input:
         genome="{plant}/reference/genome.fa",
-        gff="{plant}/reference/annotation.gtf"
     output: directory("{plant}/results/index/STAR")
     threads: 24
     benchmark: "{plant}/benchmark/star_index.txt"
@@ -594,11 +607,14 @@ rule star_index:
     shell: """
       [ -e {wildcards.plant}/STARtmp ] && rm -fr {wildcards.plant}/STARtmp
 
+      USEREF=""
+      [ -e "{wildcards.plant}/reference/annotation.gtf" ] && USEREF="--sjdbGTFfile {wildcards.plant}/reference/annotation.gtf"
+    
 	   STAR --genomeSAindexNbases 11 \
                 --runThreadN {threads} \
                 --runMode genomeGenerate \
                 --genomeFastaFiles {input.genome} \
-                --sjdbGTFfile {input.gff} \
+                --sjdbGTFfile $USEREF \
                 --sjdbOverhang 257 \
                 --limitGenomeGenerateRAM 256000000000 \
                 --outTmpDir {wildcards.plant}/STARtmp \
