@@ -499,8 +499,12 @@ rule star_map_base:
         cpus_per_task=24
     conda: "envs/STAR.yaml"
     shell: """
-                #### --twopassMode Basic \
+                #### --twopassMode Basic 
+           [ -e {wildcards.plant}/results/bam/{wildcards.sample}_tmp ] && \
+               rm -fr {wildcards.plant}/results/bam/{wildcards.sample}_tmp
+
            STAR --genomeDir {input.index} \
+                --outTmpDir {wildcards.plant}/results/bam/{wildcards.sample}_tmp \
                 --readFilesIn {input.r1pe} {input.r2pe} \
                 --outSAMunmapped Within \
                 --outFilterType BySJout \
@@ -517,6 +521,8 @@ rule star_map_base:
                 --outSAMstrandField intronMotif \
                 --outSAMheaderHD @HD VN:1.4 SO:coordinate \
                 --outFileNamePrefix {wildcards.plant}/results/bam/{wildcards.sample}/STAR
+
+            rm -fr {wildcards.plant}/results/bam/{wildcards.sample}_tmp
             """
 
 use rule star_map_base as star_map_pe with:
@@ -586,6 +592,8 @@ rule star_index:
         cpus_per_task=24
     conda: "envs/STAR.yaml"
     shell: """
+      [ -e {wildcards.plant}/STARtmp ] && rm -fr {wildcards.plant}/STARtmp
+
 	   STAR --genomeSAindexNbases 11 \
                 --runThreadN {threads} \
                 --runMode genomeGenerate \
@@ -593,5 +601,8 @@ rule star_index:
                 --sjdbGTFfile {input.gff} \
                 --sjdbOverhang 257 \
                 --limitGenomeGenerateRAM 256000000000 \
+                --outTmpDir {wildcards.plant}/STARtmp \
                 --genomeDir {output}
+
+      rm -fr {wildcards.plant}/STARtmp
            """
