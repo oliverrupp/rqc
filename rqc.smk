@@ -41,7 +41,6 @@ def get_inputs(plant, type):
                     yield("{plant}/results/{type}/{sample}/quant.sf").format(plant=p[0], type=type, sample=p[1])
 
 
-
                     
 def get_sample_report_files():
     for p in zip(PLANTS, GROUPS):
@@ -457,12 +456,19 @@ rule init_R:
 
 #### MAPPING / GUIDED ASSEMBLY #####
 
+rule all_plants_bam:
+    input: expand("{plant}/.bam_done", plant=PLANTS2)
+    output: ".bam_done"
+    shell: """ touch {output} """
+
+
 rule plant_bam:
     input: lambda wildcards: get_inputs(wildcards.plant, "bam")
     output: "{plant}/.bam_done"
     shell: """ touch {output} """
 
-           
+  
+
 
 rule assembly:
     input:
@@ -483,13 +489,7 @@ rule assembly:
 
 
 
-rule star_map:
-    input: 
-        r1pe="{plant}/results/trimmed/{sample}_R1.fastq.gz",
-        r2pe="{plant}/results/trimmed/{sample}_R2.fastq.gz",
-        index="{plant}/results/index/STAR"
-    output:
-        "{plant}/results/bam/{sample}/STARAligned.out.bam"
+rule star_map_base:
     threads: 24
     benchmark: "{plant}/benchmark/star_map.{sample}.txt"
     resources:
@@ -499,11 +499,11 @@ rule star_map:
         cpus_per_task=24
     conda: "envs/STAR.yaml"
     shell: """
+                #### --twopassMode Basic \
            STAR --genomeDir {input.index} \
                 --readFilesIn {input.r1pe} {input.r2pe} \
                 --outSAMunmapped Within \
                 --outFilterType BySJout \
-                --twopassMode Basic \
                 --outSAMattributes NH HI AS NM MD \
                 --outFilterMultimapNmax 20 \
                 --outFilterMismatchNmax 999 \
@@ -519,6 +519,21 @@ rule star_map:
                 --outFileNamePrefix {wildcards.plant}/results/bam/{wildcards.sample}/STAR
             """
 
+use rule star_map_base as star_map_pe with:
+    input: 
+        r1pe="{plant}/results/trimmed/{sample}_R1.fastq.gz",
+        r2pe="{plant}/results/trimmed/{sample}_R2.fastq.gz",
+        index="{plant}/results/index/STAR"
+    output:
+        "{plant}/results/bam/{sample}/STARAligned.out.bam"
+
+use rule star_map_base as star_map_se with:
+    input: 
+        r1pe="{plant}/results/trimmed/{sample}_S.fastq.gz",
+        r2pe=[],
+        index="{plant}/results/index/STAR"
+    output:
+        "{plant}/results/bam/{sample}/STARAligned.out.bam"
 
 
 rule sort_bam:
