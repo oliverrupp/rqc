@@ -376,7 +376,7 @@ def parse_arguments() -> argparse.Namespace:
         description="RNA Quality Control (RQC) Pipeline",
         formatter_class=lambda prog: argparse.RawTextHelpFormatter(prog, max_help_position=35), 
         epilog="""
-
+        
         """
 # Examples:
 #   rqc.py --no-conda --max-cpus 16
@@ -406,7 +406,7 @@ def parse_arguments() -> argparse.Namespace:
 
     # Organisms
     parser.add_argument(
-        "--organism",
+        "-o", "--organism",
         type=str,
         help="Comma-separated list of organisms to run (default: all)\n\n"
     )
@@ -414,14 +414,14 @@ def parse_arguments() -> argparse.Namespace:
     
     # just validate
     parser.add_argument(
-        "--validate",
+        "-v", "--validate",
         action="store_true",
         help="Validate the project folder and all subfolders"
     )
     
     # List organisms option
     parser.add_argument(
-        "--list-organisms",
+        "-l", "--list-organisms",
         action="store_true",
         help="List all valid organisms and exit\n\n"
     )
@@ -433,7 +433,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--alignment",
         action="store_true",
-        help="compute quantification based on alignment (default: pseudo-alignment)"
+        help="compute quantification based on alignments (default: on pseudo-alignments)"
     )
 
     # force assembly if GTF is missing
@@ -461,14 +461,6 @@ def parse_arguments() -> argparse.Namespace:
         help="Maximum CPUs for local execution (default: 8)"
     )
 
-    # Resource options
-    parser.add_argument(
-        "--max-memory",
-        type=int,
-        default=16000,
-        help="Maximum available memory (default: 16 Gb)"
-    )
-    
     parser.add_argument(
         "--max-jobs",
         type=int,
@@ -476,12 +468,21 @@ def parse_arguments() -> argparse.Namespace:
         help="Maximum parallel jobs for HPC execution (default: 100)"
     )
 
+    parser.add_argument(
+        "--max-memory",
+        type=int,
+        default=16000,
+        help="Maximum available memory (default: 16 Gb)"
+    )
+    
+
+    
     # HPC execution (optional - defaults to local if not specified)
     parser.add_argument(
         "--hpc",
         type=str,
         metavar="EXECUTOR",
-        help="Run pipeline on HPC cluster (slurm, lsf, pbs). Default: no cluster"
+        help="Run pipeline on HPC cluster (slurm, lsf, pbs). Default: local"
     )
         
     # HPC-specific options
@@ -495,21 +496,21 @@ def parse_arguments() -> argparse.Namespace:
     
     # Dry run
     parser.add_argument(
-        "--dry-run",
+        "-n", "--dry-run",
         action="store_true",
         help="Perform a dry run without executing jobs"
     )
 
     # rerun incomplete
     parser.add_argument(
-        "--rerun-incomplete",
+        "-r", "--rerun-incomplete",
         action="store_true",
         help="Rerun incomplete jobs"
     )
 
     # keep going
     parser.add_argument(
-        "--keep-going",
+        "-k", "--keep-going",
         action="store_true",
         help="Keep going if jobs fail"
     )
