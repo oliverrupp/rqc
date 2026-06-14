@@ -184,7 +184,7 @@ rule gtf:
 rule transcripts:
     input:
         genome="{plant}/reference/genome.fa",
-        annotation="{plant}/reference/annotation.gtf"
+        annotation="{plant}/reference/transcripts.gtf"
     output:
         "{plant}/reference/transcripts.fa"
     conda: "envs/gffread.yaml"
@@ -279,11 +279,28 @@ rule trim_se:
 
 
 
+def get_salmon_pe_input(wc):
+    yield "{plant}/results/trimmed/{sample}_R1.fastq.gz"
+    yield "{plant}/results/trimmed/{sample}_R2.fastq.gz"
+    yield "{plant}/results/index/salmon/index.complete"
+
+    if config["use_alignment"] == "true":
+        yield "{plant}/results/bam/{sample}/STARAligned.sorted.bam"
+    else:
+        yield "{plant}/results/index/salmon/index.complete"
+
+def get_salmon_se_input(wc):
+    yield "{plant}/results/trimmed/{sample}_S.fastq.gz"
+    yield "{plant}/results/index/salmon/index.complete"
+
+    if config["use_alignment"] == "true":
+        yield "{plant}/results/bam/{sample}/STARAligned.sorted.bam"
+    else:
+        yield "{plant}/results/index/salmon/index.complete"
+
+
 rule salmon_pe:
-    input:
-        r1pe="{plant}/results/trimmed/{sample}_R1.fastq.gz",
-        r2pe="{plant}/results/trimmed/{sample}_R2.fastq.gz",
-        index="{plant}/results/index/salmon/index.complete"
+    input: get_salmon_pe_input
     output:
         '{plant}/results/salmon/{sample}/quant.sf'
     threads:
@@ -295,22 +312,26 @@ rule salmon_pe:
         cpus_per_task=16
     conda: "envs/salmon.yaml"
     benchmark: "{plant}/benchmark/salmon_pe.{sample}.txt"
+    params: use_alignment=config["use_alignment"]
     shell: """
+           if [ "{params.use_alignment}" == "true" ] ; then
+                INPUT="-a {input[3]}"
+           else
+                INPUT="-1 {input[0]} -2 {input[1]} -i {wildcards.plant}/results/index/salmon"
+           fi
+    
            salmon --no-version-check quant -l A --numGibbsSamples 30 \
 		  --gcBias --validateMappings --minAssignedFrags 0 \
 		  --allowDovetail \
-	   	  -i {wildcards.plant}/results/index/salmon \
 		  -p {threads} \
 		  -o {wildcards.plant}/results/salmon/{wildcards.sample}\
-		  -1 {input.r1pe} -2 {input.r2pe}
+                  $INPUT
            """
 
 
 
 rule salmon_se:
-    input:
-        rse="{plant}/results/trimmed/{sample}_S.fastq.gz",
-        index="{plant}/results/index/salmon/index.complete"
+    input: get_salmon_se_input
     output:
         '{plant}/results/salmon/{sample}/quant.sf'
     threads:
@@ -322,14 +343,21 @@ rule salmon_se:
         cpus_per_task=16
     conda: "envs/salmon.yaml"
     benchmark: "{plant}/benchmark/salmon_se.{sample}.txt"
+    params: use_alignment=config["use_alignment"]
     shell: """
+           if [ "{params.use_alignment}" == "true" ] ; then
+                INPUT="-a {input[2]}"
+           else
+                INPUT="-r {input[0]} -i {wildcards.plant}/results/index/salmon"
+           fi
+
            salmon --no-version-check quant -l A --numGibbsSamples 30 \
 		  --gcBias --validateMappings --minAssignedFrags 0 \
 		  --allowDovetail \
 	   	  -i {wildcards.plant}/results/index/salmon \
 		  -p {threads} \
 		  -o {wildcards.plant}/results/salmon/{wildcards.sample}\
-		  -r {input.rse}
+		  $INPUT
            """
 
 
@@ -401,7 +429,19 @@ use rule falco_base as falco_trimmed with:
 
 
 
+if config["use_assembly"] == "true":
+    rule copy_scallop_gtf:
+        input: "{plant}/results/scallop.gtf"
+        output: "{plant}/reference/transcripts.gtf"
+        shell: """ cp {input} {output} """
+else:
+    rule copy_user_gtf:
+        input: "{plant}/reference/annotation.gtf"
+        output: "{plant}/reference/transcripts.gtf"
+        shell: """ cp {input} {output} """
 
+
+               
 
 #### CHECK CONDA ######
 
@@ -476,10 +516,6 @@ rule assemblies:
 
 
 
-rule gtf_from_reads:
-    input: "{plant}/results/scallop.gtf"
-    output: "{plant}/reference/annotation.gtf"
-    shell: """ cp {input} {output} """
 
 
 

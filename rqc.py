@@ -51,7 +51,7 @@ class RQCValidator:
         "reads/*_s.fq.gz"
     ]
     
-    def __init__(self, project_dir: Path, check_gtf: bool=True):
+    def __init__(self, project_dir: Path, check_gtf: bool=False):
         self.project_dir = Path(project_dir).resolve()
         self.check_gtf = check_gtf
         self.assemble_first = set()
@@ -277,12 +277,13 @@ class RQCPipeline:
         self,
         execution_mode: str,
         use_conda: bool,
+        use_alignment: bool,
         max_cpus: int,
         max_memory: int,
         max_jobs: int,
         dry_run: bool,
         rerun_incomplete: bool,
-        do_assembly: bool,
+        assembly: bool,
         keep_going: bool,
         executor: Optional[str] = None,
         hpc_config: Optional[Path] = None,
@@ -304,9 +305,15 @@ class RQCPipeline:
                 logger.warning(f"setting max-memory to {mem_mb}!")
                 max_memory = mem_mb
 
-            
+
+        use_alignment = "true" if use_alignment else "false"
+        use_assembly = "true" if assembly else "false"
+        
         cmd.extend(["--resources", f"mem_mb={max_memory}"])
-        cmd.extend(["--config", f"max_mem_mb={max_memory}"])
+        cmd.extend(["--config",
+                    f"max_mem_mb={max_memory}",
+                    f"use_alignment={use_alignment}",
+                    f"use_assembly={use_assembly}"])
         
         # Add execution mode
         if execution_mode == "hpc":
@@ -343,7 +350,7 @@ class RQCPipeline:
             cmd.extend(["--configfile", str(config_file)])
 
         # Add targets
-        validator = RQCValidator(self.project_dir, do_assembly)
+        validator = RQCValidator(self.project_dir, not assembly)
         targets = validator.get_report_targets(organisms)
         cmd.extend(targets)
         
@@ -402,9 +409,17 @@ Supported HPC executors:
         help="List all valid organisms and exit"
     )
 
+    # force quantification based on alignment
+    parser.add_argument(
+        "--alignment-quantify",
+        action="store_true",
+        help="compute quantification based on alignment"
+    )
+
+    
     # force assembly if GTF is missing
     parser.add_argument(
-        "--do-assembly",
+        "--assembly",
         action="store_true",
         help="assemble reads if annotation.gtf is missing"
     )
@@ -499,9 +514,9 @@ Supported HPC executors:
     return parser.parse_args()
 
 
-def list_organisms(project_dir: Path, do_assembly: bool=False) -> int:
+def list_organisms(project_dir: Path, assembly: bool=False) -> int:
     """List all valid organisms in the project directory."""
-    validator = RQCValidator(project_dir, not do_assembly)
+    validator = RQCValidator(project_dir, not assembly)
 
     if not validator.validate_project_structure():
         logger.error("Project structure validation failed")
@@ -567,7 +582,7 @@ def main():
     
     # Handle list-organisms option
     if args.list_organisms:
-        return list_organisms(project_dir, args.do_assembly)
+        return list_organisms(project_dir, args.assembly)
     
     # Determine execution mode (defaults to local if --hpc not specified)
     execution_mode = "hpc" if args.hpc else "local"
@@ -580,7 +595,7 @@ def main():
     
     # Validate project structure
     logger.info("Validating project structure...")
-    validator = RQCValidator(project_dir, not args.do_assembly)
+    validator = RQCValidator(project_dir, not args.assembly)
     
     if not validator.validate_project_structure():
         logger.error("Project structure validation failed")
@@ -638,12 +653,13 @@ def main():
     cmd = pipeline.build_snakemake_command(
         execution_mode=execution_mode,
         use_conda=use_conda,
+        use_alignment=args.alignment_quantify,
         max_cpus=args.max_cpus,
         max_memory=args.max_memory,
         max_jobs=args.max_jobs,
         dry_run=args.dry_run,
         rerun_incomplete=args.rerun_incomplete,
-        do_assembly=args.do_assembly,
+        assembly=args.assembly,
         keep_going=args.keep_going,
         executor=args.hpc,
         hpc_config=args.hpc_config,
