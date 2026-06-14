@@ -378,22 +378,6 @@ def parse_arguments() -> argparse.Namespace:
         epilog="""
         
         """
-# Examples:
-#   rqc.py --no-conda --max-cpus 16
-#   rqc.py --hpc slurm --max-jobs 100 --hpc-config profile.yaml
-#   rqc.py --hpc lsf --max-jobs 50 --organism subproj1,subproj2
-#   rqc.py --list-organisms
-#   rqc.py --dry-run
-#   rqc.py --validate
-#   rqc.py /path/to/project 
-
-# Supported HPC executors:
-#   slurm              SLURM job scheduler
-#   lsf                LSF job scheduler
-#   pbs                PBS/Torque job scheduler
-#   slurm_singularity  SLURM with Singularity
-#   lsf_singularity    LSF with Singularity
-#         """
     )
     
     parser.add_argument(
@@ -401,14 +385,6 @@ def parse_arguments() -> argparse.Namespace:
         nargs="?",
         default=None,
         help="Project directory (default: current working directory)"
-    )
-
-
-    # Organisms
-    parser.add_argument(
-        "-o", "--organism",
-        type=str,
-        help="Comma-separated list of organisms to run (default: all)\n\n"
     )
 
     
@@ -426,21 +402,27 @@ def parse_arguments() -> argparse.Namespace:
         help="List all valid organisms and exit\n\n"
     )
 
-
+    
+    # Organisms
+    parser.add_argument(
+        "-o", "--organism",
+        type=str,
+        help="Comma-separated list of organisms to run (default: all)\n\n"
+    )
     
     
     # force quantification based on alignment
     parser.add_argument(
         "--alignment",
         action="store_true",
-        help="compute quantification based on alignments (default: on pseudo-alignments)"
+        help="Compute quantification on genome alignments\n   (default: use pseudo-alignments)"
     )
 
     # force assembly if GTF is missing
     parser.add_argument(
         "--assembly",
         action="store_true",
-        help="assemble reads (default: use user provided GTF file)\n\n"
+        help="Run de-novo genome-guided assembly\nExtends reference annotation if available\n   (default: user provided GTF file)\n\n"
     )
 
 
@@ -482,7 +464,7 @@ def parse_arguments() -> argparse.Namespace:
         "--hpc",
         type=str,
         metavar="EXECUTOR",
-        help="Run pipeline on HPC cluster (slurm, lsf, pbs). Default: local"
+        help="Run pipeline on HPC cluster (slurm, lsf, pbs). (default: local)"
     )
         
     # HPC-specific options
