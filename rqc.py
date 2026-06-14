@@ -66,7 +66,6 @@ class RQCValidator:
             logger.error(f"Project path is not a directory: {self.project_dir}")
             return False
         
-        logger.info(f"Project directory found: {self.project_dir}")
         return True
 
     
@@ -375,24 +374,26 @@ def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="RNA Quality Control (RQC) Pipeline",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=lambda prog: argparse.RawTextHelpFormatter(prog, max_help_position=35), 
         epilog="""
-Examples:
-  rqc.py --no-conda --max-cpus 16
-  rqc.py --hpc slurm --max-jobs 100 --hpc-config profile.yaml
-  rqc.py --hpc lsf --max-jobs 50 --organism subproj1,subproj2
-  rqc.py --list-organisms
-  rqc.py --dry-run
-  rqc.py --validate
-  rqc.py /path/to/project 
 
-Supported HPC executors:
-  slurm              SLURM job scheduler
-  lsf                LSF job scheduler
-  pbs                PBS/Torque job scheduler
-  slurm_singularity  SLURM with Singularity
-  lsf_singularity    LSF with Singularity
         """
+# Examples:
+#   rqc.py --no-conda --max-cpus 16
+#   rqc.py --hpc slurm --max-jobs 100 --hpc-config profile.yaml
+#   rqc.py --hpc lsf --max-jobs 50 --organism subproj1,subproj2
+#   rqc.py --list-organisms
+#   rqc.py --dry-run
+#   rqc.py --validate
+#   rqc.py /path/to/project 
+
+# Supported HPC executors:
+#   slurm              SLURM job scheduler
+#   lsf                LSF job scheduler
+#   pbs                PBS/Torque job scheduler
+#   slurm_singularity  SLURM with Singularity
+#   lsf_singularity    LSF with Singularity
+#         """
     )
     
     parser.add_argument(
@@ -401,44 +402,57 @@ Supported HPC executors:
         default=None,
         help="Project directory (default: current working directory)"
     )
+
+
+    # Organisms
+    parser.add_argument(
+        "--organism",
+        type=str,
+        help="Comma-separated list of organisms to run (default: all)\n\n"
+    )
+
+    
+    # just validate
+    parser.add_argument(
+        "--validate",
+        action="store_true",
+        help="Validate the project folder and all subfolders"
+    )
     
     # List organisms option
     parser.add_argument(
         "--list-organisms",
         action="store_true",
-        help="List all valid organisms and exit"
+        help="List all valid organisms and exit\n\n"
     )
 
-    # force quantification based on alignment
-    parser.add_argument(
-        "--alignment-quantify",
-        action="store_true",
-        help="compute quantification based on alignment"
-    )
 
     
+    
+    # force quantification based on alignment
+    parser.add_argument(
+        "--alignment",
+        action="store_true",
+        help="compute quantification based on alignment (default: pseudo-alignment)"
+    )
+
     # force assembly if GTF is missing
     parser.add_argument(
         "--assembly",
         action="store_true",
-        help="assemble reads if annotation.gtf is missing"
+        help="assemble reads (default: use user provided GTF file)\n\n"
     )
-    
-    # HPC execution (optional - defaults to local if not specified)
-    parser.add_argument(
-        "--hpc",
-        type=str,
-        metavar="EXECUTOR",
-        help="Run pipeline on HPC cluster with specified executor (slurm, lsf, pbs). Default: local execution"
-    )
+
+
     
     # Conda
     parser.add_argument(
         "--no-conda",
         action="store_true",
-        help="Do not use conda environments (default: use conda)"
+        help="Do not use conda environments (default: use conda)\n\n"
     )
-    
+
+
     # Resource options
     parser.add_argument(
         "--max-cpus",
@@ -461,20 +475,23 @@ Supported HPC executors:
         default=100,
         help="Maximum parallel jobs for HPC execution (default: 100)"
     )
-    
+
+    # HPC execution (optional - defaults to local if not specified)
+    parser.add_argument(
+        "--hpc",
+        type=str,
+        metavar="EXECUTOR",
+        help="Run pipeline on HPC cluster (slurm, lsf, pbs). Default: no cluster"
+    )
+        
     # HPC-specific options
     parser.add_argument(
         "--hpc-config",
         type=Path,
-        help="Snakemake HPC profile/config file (YAML format)"
+        help="Snakemake HPC profile/config file (YAML format)\n\n"
     )
+
     
-    # Organisms
-    parser.add_argument(
-        "--organism",
-        type=str,
-        help="Comma-separated list of organisms to run (default: all)"
-    )
     
     # Dry run
     parser.add_argument(
@@ -497,13 +514,6 @@ Supported HPC executors:
         help="Keep going if jobs fail"
     )
 
-    # just validate
-    parser.add_argument(
-        "--validate",
-        action="store_true",
-        help="Validate the project folder and all subfolders"
-    )
-
     # Config file
     parser.add_argument(
         "--config",
@@ -518,11 +528,7 @@ def list_organisms(project_dir: Path, assembly: bool=False) -> int:
     """List all valid organisms in the project directory."""
     validator = RQCValidator(project_dir, not assembly)
 
-    if not validator.validate_project_structure():
-        logger.error("Project structure validation failed")
-        return 1
-
-    all_organisms = validator.find_organisms()
+    all_organisms = validator.find_organisms(False)
 
     if not all_organisms:
         logger.error("No valid organisms found")
@@ -579,19 +585,13 @@ def main():
     
     # Determine project directory (use current working directory if not specified)
     project_dir = Path(args.project_dir) if args.project_dir else Path.cwd()
-    
-    # Handle list-organisms option
-    if args.list_organisms:
-        return list_organisms(project_dir, args.assembly)
-    
+        
     # Determine execution mode (defaults to local if --hpc not specified)
     execution_mode = "hpc" if args.hpc else "local"
     use_conda = not args.no_conda 
     
     logger.info("RNA Quality Control (RQC) Pipeline")
     logger.info(f"Project directory: {project_dir}")
-    logger.info(f"Execution mode: {execution_mode}")
-    logger.info(f"Conda support: {use_conda}")
     
     # Validate project structure
     logger.info("Validating project structure...")
@@ -602,7 +602,7 @@ def main():
         sys.exit(1)
     
     # Find and filter organisms
-    all_organisms = validator.find_organisms()
+    all_organisms = validator.find_organisms(args.validate)
     if not all_organisms:
         logger.error("No valid organisms found")
         sys.exit(1)
@@ -629,7 +629,17 @@ def main():
             logger.error(f"Config file not found: {args.config}")
             sys.exit(1)
         logger.info(f"Using config file: {args.config}")
+
+    if args.list_organisms:
+        # Handle list-organisms option
+        list_organisms(project_dir, args.assembly)
+        print()
+        if not args.validate:
+            return
     
+    logger.info(f"Execution mode: {execution_mode}")
+    logger.info(f"Conda support: {use_conda}")
+        
     # Validate Snakemake file
     logger.info("Validating Snakemake configuration...")
     pipeline = RQCPipeline(project_dir, script_dir)
@@ -653,7 +663,7 @@ def main():
     cmd = pipeline.build_snakemake_command(
         execution_mode=execution_mode,
         use_conda=use_conda,
-        use_alignment=args.alignment_quantify,
+        use_alignment=args.alignment,
         max_cpus=args.max_cpus,
         max_memory=args.max_memory,
         max_jobs=args.max_jobs,
@@ -666,6 +676,7 @@ def main():
         organisms=selected_organisms,
         config_file=args.config
     )
+
     
     # Run Snakemake
     if args.dry_run:
