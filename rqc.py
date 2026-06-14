@@ -373,7 +373,7 @@ class RQCPipeline:
 def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="RNA Quality Control (RQC) Pipeline",
+        description="RNA Quality Control Pipeline",
         formatter_class=lambda prog: argparse.RawTextHelpFormatter(prog, max_help_position=35), 
         epilog="""
         
@@ -573,7 +573,7 @@ def main():
     execution_mode = "hpc" if args.hpc else "local"
     use_conda = not args.no_conda 
     
-    logger.info("RNA Quality Control (RQC) Pipeline")
+    logger.info("RNA Quality Control Pipeline")
     logger.info(f"Project directory: {project_dir}")
     
     # Validate project structure

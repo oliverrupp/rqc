@@ -549,13 +549,13 @@ rule star_map_base:
         cpus_per_task=24
     conda: "envs/STAR.yaml"
     shell: """
-                #### --twopassMode Basic 
-           [ -e {wildcards.plant}/results/bam/{wildcards.sample}_tmp ] && \
+            [ -e {wildcards.plant}/results/bam/{wildcards.sample}_tmp ] && \
                rm -fr {wildcards.plant}/results/bam/{wildcards.sample}_tmp
 
            STAR --genomeDir {input.index} \
                 --outTmpDir {wildcards.plant}/results/bam/{wildcards.sample}_tmp \
                 --readFilesIn {input.r1pe} {input.r2pe} \
+                --twopassMode Basic \
                 --outSAMunmapped Within \
                 --outFilterType BySJout \
                 --outSAMattributes NH HI AS NM MD \
