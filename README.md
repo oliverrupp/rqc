@@ -35,6 +35,7 @@ First time running the script will check for Conda and will install the main Con
 - [Usage](docs/usage.md)
 - [Input Data Format](docs/input-data.md)
 - [Workflow](docs/workflow.md)
+- [Using HPC](docs/hpc.md)
 - [QC Metrics](docs/qc-metrics.md)
 - [Metric Interpretation Guide](docs/interpretation.md)
 - [Report Guide](docs/report-guide.md)
