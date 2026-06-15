@@ -34,7 +34,7 @@ First time running the script will check for Conda and will install the main Con
 ## Documentation
 - [Usage](docs/usage.md)
 - [Input Data Format](docs/input-data.md)
-- [Workflow](docs/workflow.md)
+- [Workflow/Output](docs/workflow.md)
 - [Using a HPC Cluster](docs/hpc.md)
 - [QC Metrics](docs/qc-metrics.md)
 - [Metric Interpretation Guide](docs/interpretation.md)
