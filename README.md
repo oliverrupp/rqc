@@ -46,7 +46,7 @@ First time running the script will check for Conda and will install the main Con
 
 ## Help
 
-```bash
+```text
 usage: rqc.py [-h] [-v] [-l] [-o ORGANISM] [--alignment] [--assembly] [--no-conda] [--max-cpus MAX_CPUS] [--max-jobs MAX_JOBS] [--max-memory MAX_MEMORY] [--hpc EXECUTOR] [--hpc-config HPC_CONFIG] [-n] [-r]
               [-k] [--config CONFIG]
               [project_dir]
