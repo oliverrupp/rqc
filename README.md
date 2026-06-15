@@ -281,3 +281,14 @@ Optional benchmark statistics collected from Snakemake:
 * Memory consumption per workflow step
 * CPU utilization information
  
+---
+
+## Documentation
+
+- [Workflow](docs/workflow.md)
+- [Input Data Format](docs/input-data.md)
+- [QC Metrics](docs/qc-metrics.md)
+- [Metric Interpretation Guide](docs/interpretation.md)
+- [Report Guide](docs/report-guide.md)
+- [Benchmarking and Performance](docs/benchmarking.md)
+- [FAQ](docs/faq.md)
