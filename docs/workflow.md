@@ -19,11 +19,22 @@ organism/
 └── report/
       └── samples*.report.html
 └── tsv/samples*/
-          └── g_TPM.tsv
-	      └── t_TPM.tsv
-          └── g_TMM.tsv
-	      └── t_TMM.tsv
+          ├── g_TPM.tsv
+	      ├── t_TPM.tsv
+          ├── g_TMM.tsv
+	      ├── t_TMM.tsv
+		  └── ...
 ```
 
 Interactive reports contain plots, tables, PCA visualizations, QC summaries, and sequencing diagnostics.
-Raw and noramlized counts will be available in the `tsv/samples*` folders. All normalizations will be computed separately for each `samples*.tsv` file.
+Raw and noramlized counts will be available in the `tsv/samples*` folders. 
+
+### Available Counts
+All counts are available on gene-level (`g_`) and transcript-level (`t_`).
+
+- raw counts (estimated values by salmon)
+- TPM
+- TMM
+- geTMM
+
+All normalizations will be computed separately for each `samples*.tsv` file.
