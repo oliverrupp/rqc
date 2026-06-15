@@ -31,3 +31,18 @@ Dry run:
 ```bash
 rqc --dry-run
 ```
+
+Run a genome-guided assembly of the RNA-seq reads, if no annotation is available.
+
+```bash
+rqc --assembly
+```
+
+Align reads to genome with STAR, use the aligned reads for quantification
+
+```bash
+rqc --alignment
+```
+
+
+
