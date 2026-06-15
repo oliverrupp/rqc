@@ -123,7 +123,6 @@ Interactive reports contain plots, tables, PCA visualizations, QC summaries, and
 
 Three major factors can affect the quality of RNA-seq data and the reliability of downstream analyses. This page summarizes each factor using a single metric. Additional details and diagnostic plots are provided on the corresponding pages for each factor.
 
-  &nbsp;
 
 ##### **1. Complexity**
 
@@ -135,7 +134,6 @@ Low complexity can result from several factors, including overrepresentation of 
 
 The **Library** page provides additional metrics that help identify the underlying cause of low complexity.
 
-  &nbsp;
 
 ##### **2. Degradation**
 
@@ -145,7 +143,6 @@ In high-quality libraries, read coverage is expected to be approximately uniform
 
 The **RNA Degradation** page provides detailed gene body coverage profiles for each sample.
 
-  &nbsp;
 
 ##### **3. Replicate Consistency**
 
@@ -157,6 +154,8 @@ If additional metadata variables (batch factors) are available, the same metric 
 
 The **PCA** page contains both the sample correlation heatmap and PCA plots, which can be used to identify outlier samples and potential batch effects.
 
+
+---
 
 ## Library Complexity
 
