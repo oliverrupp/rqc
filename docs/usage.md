@@ -45,4 +45,18 @@ rqc --alignment
 ```
 
 
+Snakemake automatically resumes incomplete workflows.
+Only missing or outdated outputs will be recomputed.
 
+Simply rerun:
+
+```bash
+rqc --rerun-incomplete
+```
+
+
+Continue pipeline execution on failed jobs
+
+```bash
+rqc --keep-going
+```
