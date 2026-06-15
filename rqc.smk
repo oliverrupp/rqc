@@ -354,7 +354,6 @@ rule salmon_se:
            salmon --no-version-check quant -l A --numGibbsSamples 30 \
 		  --gcBias --validateMappings --minAssignedFrags 0 \
 		  --allowDovetail \
-	   	  -i {wildcards.plant}/results/index/salmon \
 		  -p {threads} \
 		  -o {wildcards.plant}/results/salmon/{wildcards.sample}\
 		  $INPUT
