@@ -48,7 +48,7 @@ rqc --list-organisms
 Run a subset of organisms:
 
 ```bash
-rqc --organism *Arabidopsis*,*Oryza"
+rqc --organism Arabidopsis,Oryza
 ```
 
 Dry run:
@@ -63,7 +63,7 @@ Projects may contain one or more organisms/species.
 
 ```text
 project/
-├── *Arabidopsis*/
+├── Arabidopsis/
 │   ├── reads/
 │   │   ├── sample1_1.fq.gz
 │   │   ├── sample1_2.fq.gz
@@ -72,12 +72,11 @@ project/
 │   │
 │   └── reference/
 │       ├── genome.fa
-│       ├── annotation.gtf      # optional if assembly mode is used
-│       ├── annotation.gff3     # optional if assembly mode is used
+│       ├── annotation.gtf      # or GFF3, optional if assembly mode is used
 │       ├── samples.tsv
 │       └── samples_batch.tsv   # optional additional sample sheets
 │
-└── *Oryza"/
+└── Oryza/
     └── ...
 ```
 
