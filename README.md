@@ -32,7 +32,7 @@ First time running the script will check for Conda and will install the main Con
 
 ## Conda Environment
 
-Other required Conda environments will be install by snakemake locally in the `projects` folder.
+Required Conda environments will be install by snakemake locally in the `projects` folder.
 
 The first execution may take several minutes while dependencies are installed.
 
@@ -47,7 +47,7 @@ Subsequent executions in the same project reuse existing environments.
 - [Using a HPC Cluster](docs/hpc.md)
 - [QC Metrics](docs/qc-metrics.md)
 - [Metric Interpretation Guide](docs/interpretation.md)
-- [Benchmarking and Performance](docs/benchmarking.md)
+- [Benchmarking](docs/benchmarking.md)
 - [FAQ](docs/faq.md)
 
 ---

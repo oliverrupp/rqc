@@ -730,7 +730,8 @@ Help
 
 Column {.tabset}
 -------------------------------------
-## Library Complexity
+
+### Library Complexity
 
 #### Read Assignment
 
@@ -776,9 +777,9 @@ Exponentiated Shannon entropy; interpretable as the effective number of expresse
 
 Estimated library fragment size.
 
----
 
-## RNA Degradation
+
+### RNA Degradation
 
 #### Gene Body Coverage
 
@@ -788,9 +789,9 @@ Coverage distribution across transcript bodies.
 
 5′/3′ coverage bias used to identify RNA degradation. Values near zero indicate uniform coverage.
 
----
 
-## Replicate Consistency
+
+### Replicate Consistency
 
 #### Sample Correlation
 
@@ -808,9 +809,9 @@ Within-condition dispersion used to quantify replicate consistency.
 
 Similarity of highly expressed genes between samples.
 
----
 
-## Differential Expression Diagnostics
+
+### Differential Expression Diagnostics
 
 #### Size Factors
 
@@ -820,9 +821,9 @@ Normalization factors used for count scaling.
 
 Gene-wise and fitted dispersion estimates used by differential expression methods.
 
----
 
-## Sequencing QC
+
+### Sequencing QC
 
 #### Per-Base Quality
 
@@ -848,4 +849,3 @@ Estimated fragment size distribution for paired-end libraries.
 
 ### Benchmark
 
--
