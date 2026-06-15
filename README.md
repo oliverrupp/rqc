@@ -29,6 +29,15 @@ First time running the script will check for Conda and will install the main Con
 ./rqc --help
 ```
 
+
+## Conda Environment
+
+Other required Conda environments will be install by snakemake locally in the `projects` folder.
+
+The first execution may take several minutes while dependencies are installed.
+
+Subsequent executions in the same project reuse existing environments.
+
 ---
 
 ## Documentation

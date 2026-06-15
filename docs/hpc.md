@@ -49,17 +49,3 @@ rqc --hpc slurm --hpc-config config.yaml
 ```
 
 ---
-
-## Conda Environment
-
-The `rqc` wrapper automatically creates the main required Conda environment for snakemake.
-
-Other Conda environments will be install by snakemake in the `projects` folder.
-
-The first execution may take several minutes while dependencies are installed.
-
-Subsequent executions in the same project reuse existing environments.
-
-
-
----
