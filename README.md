@@ -4,7 +4,7 @@ RQC is a Snakemake-based RNA-seq quality control workflow that generates an inte
 
 ## Requirements
 
-Only **Conda** (Miniconda or Anaconda) must be installed and the user must have the rights to create an environment.
+Only [**Conda**](https://www.anaconda.com/docs/getting-started/miniconda/main) (Miniconda or Anaconda) must be installed and the user must have the rights to create an environment.
 
 All other software dependencies are installed automatically by the `rqc` script.
 
