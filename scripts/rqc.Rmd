@@ -753,9 +753,6 @@ Number of detected transcripts as a function of sequencing depth.
 
 Area under the gene-detection curve. Higher values indicate more efficient transcript discovery at lower sequencing depth.
 
-#### Tail Gain
-
-Fraction of additional genes detected after ~75% of reads have been sampled. High values suggest sequencing depth has not yet saturated.
 
 #### Top-100 Transcript Fraction
 
