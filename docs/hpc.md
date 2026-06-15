@@ -32,9 +32,12 @@ RQC assumes that all compute nodes can access:
 
 ```text
 project/
-├── reads/
-├── reference/
-└── results/
+└── organism1/
+      ├── reads/
+      ├── reference/
+      └── results/
+└── organism2/
+      └── ...
 ```
 
 through a shared filesystem such as:
