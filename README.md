@@ -41,6 +41,11 @@ First time running the script will check for Conda and will install the main Con
 - [Benchmarking and Performance](docs/benchmarking.md)
 - [FAQ](docs/faq.md)
 
+---
+
+## Using GenXBrowser
+
+**TODO**
 
 ---
 

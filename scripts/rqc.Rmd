@@ -730,85 +730,120 @@ Help
 
 Column {.tabset}
 -------------------------------------
+## Library Complexity
 
-### **Library Complexity**
+#### Read Assignment
 
-#### **Read Assignment**
+Distribution of reads across assigned features, rRNA, unmapped reads, low-quality reads, and filtering categories.
 
--
+#### Mapping Rate
 
-  &nbsp;
+Percentage of reads assigned to annotated features.
 
-#### **Library Metrics**
+#### Detected Genes
 
--
+Number of genes/transcripts detected in a sample.
 
-  &nbsp;
+#### Gene Detection Curve
 
-#### **Gene Detection**
+Number of detected transcripts as a function of sequencing depth.
 
-- 
+#### Normalized AUC
 
+Area under the gene-detection curve. Higher values indicate more efficient transcript discovery at lower sequencing depth.
 
-### **RNA Degradation**
+#### Tail Gain
 
-#### **Genebody Coverage**
+Fraction of additional genes detected after ~75% of reads have been sampled. High values suggest sequencing depth has not yet saturated.
 
--
+#### Top-100 Transcript Fraction
 
+Fraction of reads assigned to the 100 most abundant transcripts. Elevated values may indicate low library complexity.
 
-### **Replicate Consistency**
+#### Duplication Rate
 
-#### **Sample Correlation**
+Estimated read duplication level.
 
--
+#### Shannon Entropy
 
-  &nbsp;
+Diversity of transcript abundance distribution.
 
-#### **Principle Component Analysis**
+#### Effective Gene Count
 
--
+Exponentiated Shannon entropy; interpretable as the effective number of expressed genes.
 
-  &nbsp;
+#### Fragment Length
 
-#### **Principle Components Pairs**
+Estimated library fragment size.
 
--
+---
 
+## RNA Degradation
 
+#### Gene Body Coverage
 
-### **Differentiag Gene Expression Analysis**
+Coverage distribution across transcript bodies.
 
-#### **Size Factor**
+#### Degradation Score
 
--
+5′/3′ coverage bias used to identify RNA degradation. Values near zero indicate uniform coverage.
 
-  &nbsp;
+---
 
-#### **by Condition**
+## Replicate Consistency
 
--
+#### Sample Correlation
 
-  &nbsp;
+Pearson correlation between samples using highly variable genes.
 
-#### **Dispersion**
+#### PCA
 
--
+Principal component analysis of gene expression profiles to identify outliers and batch effects.
 
+#### PCA Distance to Centroid
 
+Within-condition dispersion used to quantify replicate consistency.
 
-### **Sequencing QC**
+#### Top-1000 Gene Jaccard Similarity
 
-#### **FastP**
+Similarity of highly expressed genes between samples.
 
--
+---
 
-  &nbsp;
+## Differential Expression Diagnostics
 
+#### Size Factors
 
-#### **FastQC/Falco**
+Normalization factors used for count scaling.
 
-- 
+#### Dispersion Estimates
+
+Gene-wise and fitted dispersion estimates used by differential expression methods.
+
+---
+
+## Sequencing QC
+
+#### Per-Base Quality
+
+Base quality scores before and after trimming.
+
+#### Per-Sequence Quality
+
+Distribution of read quality scores.
+
+#### GC Content
+
+GC-content profiles across read positions.
+
+#### Adapter Content
+
+Residual adapter contamination after trimming.
+
+#### Insert Size Distribution
+
+Estimated fragment size distribution for paired-end libraries.
+ 
 
 
 ### Benchmark
