@@ -25,6 +25,8 @@ project/
 
 ### Sample Table
 
+Multiple `samples*.tsv` are allowd, each file will be analyzed separately. This allows for different projects on the same reference organism.
+
 At minimum, every `samples*.tsv` file must contain:
 
 | column    | description                                |

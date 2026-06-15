@@ -33,8 +33,8 @@ First time running the script will check for Conda and will install the main Con
 
 ## Documentation
 - [Usage](docs/usage.md)
-- [Workflow](docs/workflow.md)
 - [Input Data Format](docs/input-data.md)
+- [Workflow](docs/workflow.md)
 - [QC Metrics](docs/qc-metrics.md)
 - [Metric Interpretation Guide](docs/interpretation.md)
 - [Report Guide](docs/report-guide.md)
