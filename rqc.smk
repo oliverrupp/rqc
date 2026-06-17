@@ -290,85 +290,56 @@ rule trim_se:
            """
 
 
-
-def get_salmon_pe_input(wc):
-    yield "{plant}/results/trimmed/{sample}_R1.fastq.gz"
-    yield "{plant}/results/trimmed/{sample}_R2.fastq.gz"
-    yield "{plant}/results/index/salmon/index.complete"
-
-    if config["use_alignment"] == "true":
-        yield "{plant}/results/bam/{sample}/STARAligned.sorted.bam"
-    else:
-        yield "{plant}/results/index/salmon/index.complete"
-
-def get_salmon_se_input(wc):
-    yield "{plant}/results/trimmed/{sample}_S.fastq.gz"
-    yield "{plant}/results/index/salmon/index.complete"
-
-    if config["use_alignment"] == "true":
-        yield "{plant}/results/bam/{sample}/STARAligned.sorted.bam"
-    else:
-        yield "{plant}/results/index/salmon/index.complete"
-
-
 rule salmon_pe:
-    input: get_salmon_pe_input
+    input: 
+      rpe1="{plant}/results/trimmed/{sample}_R1.fastq.gz",
+      rpe2="{plant}/results/trimmed/{sample}_R2.fastq.gz",
+      index="{plant}/results/index/salmon/index.complete"
     output:
         '{plant}/results/salmon/{sample}/quant.sf'
     threads:
         16 
     resources:
-        mem_mb=MAX_MEM_MB,
+        mem_mb=lambda wc: 64000 if use_large(wc) else 16000,
         runtime=360,
         nodes=1,
         cpus_per_task=16
     conda: "envs/salmon.yaml"
     benchmark: "{plant}/benchmark/salmon_pe.{sample}.txt"
-    params: use_alignment=config["use_alignment"]
     shell: """
-           if [ "{params.use_alignment}" == "true" ] ; then
-                INPUT="-a {input[3]}"
-           else
-                INPUT="-1 {input[0]} -2 {input[1]} -i {wildcards.plant}/results/index/salmon"
-           fi
-    
-           salmon --no-version-check quant -l A --numGibbsSamples 30 \
-		  --gcBias --validateMappings --minAssignedFrags 0 \
-		  --allowDovetail \
-		  -p {threads} \
-		  -o {wildcards.plant}/results/salmon/{wildcards.sample}\
-                  $INPUT
+        salmon --no-version-check quant -l A --numGibbsSamples 30 \
+		      --gcBias --validateMappings --minAssignedFrags 0 \
+		      --allowDovetail \
+		      -p {threads} \
+		      -o {wildcards.plant}/results/salmon/{wildcards.sample} \
+            -1 {input[0]} -2 {input[1]} \
+            -i {wildcards.plant}/results/index/salmon
            """
 
 
 
 rule salmon_se:
-    input: get_salmon_se_input
+    input:  
+      rse="{plant}/results/trimmed/{sample}_S.fastq.gz",
+      index="{plant}/results/index/salmon/index.complete"
     output:
         '{plant}/results/salmon/{sample}/quant.sf'
     threads:
         16
     resources:
-        mem_mb=MAX_MEM_MB,
+        mem_mb=lambda wc: 64000 if use_large(wc) else 16000,
         runtime=360,
         nodes=1,
         cpus_per_task=16
     conda: "envs/salmon.yaml"
     benchmark: "{plant}/benchmark/salmon_se.{sample}.txt"
-    params: use_alignment=config["use_alignment"]
     shell: """
-           if [ "{params.use_alignment}" == "true" ] ; then
-                INPUT="-a {input[2]}"
-           else
-                INPUT="-r {input[0]} -i {wildcards.plant}/results/index/salmon"
-           fi
-
-           salmon --no-version-check quant -l A --numGibbsSamples 30 \
-		  --gcBias --validateMappings --minAssignedFrags 0 \
-		  --allowDovetail \
-		  -p {threads} \
-		  -o {wildcards.plant}/results/salmon/{wildcards.sample}\
-		  $INPUT
+        salmon --no-version-check quant -l A --numGibbsSamples 30 \
+		      --gcBias --validateMappings --minAssignedFrags 0 \
+		      --allowDovetail \
+		      -p {threads} \
+		      -o {wildcards.plant}/results/salmon/{wildcards.sample} \
+            -r {input[0]} -i {wildcards.plant}/results/index/salmon"
            """
 
 
@@ -517,12 +488,13 @@ rule busco_run:
     output: directory("{plant}/results/busco/{type}")
     conda: "envs/busco.yaml"
     threads: 32
+    benchmark: "{plant}/benchmark/busco_{type}.txt"
     params: lineage = config.get("busco", "eukaryota")
     shell: """
            TYPE={wildcards.type}
            [ $TYPE == "transcripts" ] && TYPE="transcriptome"
            if [ -s {input} ] ; then
-              busco -i {input} -o {output} -l {params.lineage} -c {threads} -m $TYPE -f
+              busco -i {input} -o {output} -l {params.lineage} -c {threads} -m $TYPE -f --skip_bbtools
            else
               mkdir -p {output}
            fi

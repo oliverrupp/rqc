@@ -276,7 +276,6 @@ class RQCPipeline:
         self,
         execution_mode: str,
         use_conda: bool,
-        use_alignment: bool,
         max_cpus: int,
         max_memory: int,
         max_jobs: int,
@@ -306,17 +305,7 @@ class RQCPipeline:
                 max_memory = mem_mb
 
 
-        use_alignment = "true" if use_alignment else "false"
-        use_assembly = "true" if assembly else "false"
-
-        busco_str = f"busco={busco}" if not busco is None else "" 
-        
-        cmd.extend(["--resources", f"mem_mb={max_memory}"])
-        cmd.extend(["--config", busco_str, 
-                    f"max_mem_mb={max_memory}",
-                    f"use_alignment={use_alignment}",
-                    f"use_assembly={use_assembly}"])
-        
+       
         # Add execution mode
         if execution_mode == "hpc":
             # Snakemake 9 uses --executor option
@@ -351,11 +340,23 @@ class RQCPipeline:
         if config_file:
             cmd.extend(["--configfile", str(config_file)])
 
+
         # Add targets
         validator = RQCValidator(self.project_dir, not assembly)
         targets = validator.get_report_targets(organisms)
         cmd.extend(targets)
-        
+
+
+        use_assembly = "true" if assembly else "false"
+
+        busco_str = f"busco={busco}" if not busco is None else ""
+
+        cmd.extend(["--resources", f"mem_mb={max_memory}"])
+
+        cmd.extend(["--config", busco_str,
+                                f"max_mem_mb={max_memory}",
+                                f"use_assembly={use_assembly}"])
+
         return cmd
     
     def run_snakemake(self, cmd: List[str]) -> int:
@@ -414,13 +415,6 @@ def parse_arguments() -> argparse.Namespace:
     )
     
     
-    # force quantification based on alignment
-    parser.add_argument(
-        "--alignment",
-        action="store_true",
-        help="Compute quantification on genome alignments\n   (default: use pseudo-alignments)"
-    )
-
     # force assembly if GTF is missing
     parser.add_argument(
         "--assembly",
@@ -657,7 +651,6 @@ def main():
     cmd = pipeline.build_snakemake_command(
         execution_mode=execution_mode,
         use_conda=use_conda,
-        use_alignment=args.alignment,
         max_cpus=args.max_cpus,
         max_memory=args.max_memory,
         max_jobs=args.max_jobs,
