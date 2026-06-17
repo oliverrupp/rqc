@@ -80,12 +80,12 @@ options:
   -l, --list-organisms     List all valid organisms and exit
                            
   -o, --organism ORGANISM  Comma-separated list of organisms to run (default: all)
-                           
-  --alignment              Compute quantification on genome alignments
-                              (default: use pseudo-alignments)
+                                            
   --assembly               Run de-novo genome-guided assembly
                            Extends reference annotation if available
                               (default: user provided GTF file)
+
+  --busco LINEAGE          Set BUSCO lineage (default: eukaryota)
                            
   --no-conda               Do not use conda environments (default: use conda)
                            
