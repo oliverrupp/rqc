@@ -287,6 +287,7 @@ class RQCPipeline:
         executor: Optional[str] = None,
         hpc_config: Optional[Path] = None,
         organisms: Optional[List[str]] = None,
+        busco: Optional[str] = None,
         config_file: Optional[Path] = None
     ) -> List[str]:
         """Build the Snakemake command with all options (Snakemake 9 compatible)."""
@@ -307,9 +308,11 @@ class RQCPipeline:
 
         use_alignment = "true" if use_alignment else "false"
         use_assembly = "true" if assembly else "false"
+
+        busco_str = f"busco={busco}" if not busco is None else "" 
         
         cmd.extend(["--resources", f"mem_mb={max_memory}"])
-        cmd.extend(["--config",
+        cmd.extend(["--config", busco_str, 
                     f"max_mem_mb={max_memory}",
                     f"use_alignment={use_alignment}",
                     f"use_assembly={use_assembly}"])
@@ -425,6 +428,14 @@ def parse_arguments() -> argparse.Namespace:
         help="Run de-novo genome-guided assembly\nExtends reference annotation if available\n   (default: user provided GTF file)\n\n"
     )
 
+    
+    # set BUSCO lieage
+    parser.add_argument(
+        "--busco",
+        type=str,
+        metavar="LINEAGE",
+        help="Set BUSCO lineage (default: eukaryota)\n\n"
+    )
 
     
     # Conda
@@ -657,6 +668,7 @@ def main():
         executor=args.hpc,
         hpc_config=args.hpc_config,
         organisms=selected_organisms,
+        busco=args.busco,
         config_file=args.config
     )
 

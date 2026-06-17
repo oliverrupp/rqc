@@ -80,7 +80,8 @@ rule report_subproject:
         salmon_rrna=lambda wildcards: get_inputs(wildcards.plant, "salmon_rrna"),
         salmon_quantiles=lambda wildcards: get_inputs(wildcards.plant, "salmon_quantiles"),
         qc_untrimmed=lambda wildcards: get_inputs(wildcards.plant, "qc_untrimmed"),
-        qc_trimmed=lambda wildcards: get_inputs(wildcards.plant, "qc_trimmed")
+        qc_trimmed=lambda wildcards: get_inputs(wildcards.plant, "qc_trimmed"),
+        busco="{plant}/results/busco/.busco.done"
     output:
         report='{plant}/report/samples{group}.report.html'
     wildcard_constraints:
@@ -192,6 +193,17 @@ rule transcripts:
            gffread {input.annotation} -g {input.genome} -w {output} 
            """
 
+
+rule proteins:
+    input:
+        genome="{plant}/reference/genome.fa",
+        annotation="{plant}/reference/transcripts.gtf"
+    output:
+        "{plant}/reference/proteins.fa"
+    conda: "envs/gffread.yaml"
+    shell: """
+           gffread {input.annotation} -g {input.genome} -S -y {output} 
+           """
 
 
 rule quantiles:
@@ -491,8 +503,32 @@ rule init_R:
     shell: """R --version > {output}"""
 
 
+#### BUSCO  #####
+
+rule busco:
+    input: "{plant}/results/busco/genome",
+           "{plant}/results/busco/transcripts",
+           "{plant}/results/busco/proteins"
+    output: "{plant}/results/busco/.busco.done"
 
 
+rule busco_run:
+    input: "{plant}/reference/{type}.fa"
+    output: directory("{plant}/results/busco/{type}")
+    conda: "envs/busco.yaml"
+    threads: 32
+    params: lineage = config.get("busco", "eukaryota")
+    shell: """
+           TYPE={wildcards.type}
+           [ $TYPE == "transcripts" ] && TYPE="transcriptome"
+           if [ -s {input} ] ; then
+              busco -i {input} -o {output} -l {params.lineage} -c {threads} -m $TYPE -f
+           else
+              mkdir -p {output}
+           fi
+    """
+
+    
 #### MAPPING / GUIDED ASSEMBLY #####
 
 rule all_plants_bam:
