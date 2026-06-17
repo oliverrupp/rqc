@@ -510,7 +510,7 @@ rule busco:
            "{plant}/results/busco/transcripts",
            "{plant}/results/busco/proteins"
     output: "{plant}/results/busco/.busco.done"
-
+    shell: """ touch {output} """
 
 rule busco_run:
     input: "{plant}/reference/{type}.fa"
