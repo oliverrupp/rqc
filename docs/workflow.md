@@ -2,7 +2,7 @@
 
 1. Input validation
 2. Read preprocessing and trimming
-3. Read alignment or quantification
+3. Optional: Read alignment 
 4. Gene and transcript quantification
 5. Library complexity analysis
 6. RNA degradation analysis
