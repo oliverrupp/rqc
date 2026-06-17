@@ -38,10 +38,10 @@ Run a genome-guided assembly of the RNA-seq reads, if no annotation is available
 rqc --assembly
 ```
 
-Align reads to genome with STAR, use the aligned reads for quantification
+Run [BUSCO](https://busco.ezlab.org/) analysis with specific lineage
 
 ```bash
-rqc --alignment
+rqc --busco LINEAGE
 ```
 
 
