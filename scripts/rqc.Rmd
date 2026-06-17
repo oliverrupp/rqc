@@ -25,6 +25,7 @@ data_dir         <- gsub(".tsv", "", basename(samples_file))
 benchmark_folder <- paste0(prj_dir, "/benchmark/")
 fastp_folder     <- paste0(prj_dir, "/results/trimmed")
 falco_folder     <- paste0(prj_dir, "/results/falco")
+busco_folder     <- paste0(prj_dir, "/results/busco")
 
 condition_file   <- paste0(prj_dir, "/tsv/", data_dir, "/condition_df.tsv")
 complexity_file  <- paste0(prj_dir, "/tsv/", data_dir, "/complexity.tsv")
@@ -39,6 +40,7 @@ size_factor_file <- paste0(prj_dir, "/tsv/", data_dir, "/size_factor_qc.tsv")
 dispersion_file  <- paste0(prj_dir, "/tsv/", data_dir, "/g_dispersion.tsv")
 lib_type_file    <- paste0(prj_dir, "/tsv/", data_dir, "/lib_type.tsv")
 frag_len_file    <- paste0(prj_dir, "/tsv/", data_dir, "/fragment_length.tsv")
+
 
 samples_df       <- read.table(samples_file,     check.names = FALSE, header = T, sep = "\t") |> column_to_rownames("sample") |> as.data.frame()
 condition_df     <- read.table(condition_file,   check.names = FALSE, row.names = 1, header = T, sep = "\t")
@@ -686,6 +688,55 @@ if(nrow(ac_df_filt) > 0) {
 }
 ```
 
+BUSCO
+=====================================
+
+Column {data-width=650}
+-------------------------------------
+
+### **BUSCO Metrics**
+
+```{r include=FALSE}
+read_busco <- function(file) {
+  busco <- fromJSON(file)
+
+  unlist(busco$results[c("Single copy BUSCOs", 
+                         "Multi copy BUSCOs", 
+                         "Fragmented BUSCOs", 
+                         "Missing BUSCOs")]) |> data.frame() |> 
+    setNames("count") |> rownames_to_column("BUSCO") -> busco_values
+
+  unlist(busco$results[c("Single copy percentage", 
+                         "Multi copy percentage", 
+                         "Fragmented percentage", 
+                         "Missing percentage")]) |> data.frame() |> 
+    setNames("pct") -> busco_pct
+  
+  busco_values <- cbind(busco_values, busco_pct)
+  
+  busco_values$BUSCO <- factor(busco_values$BUSCO, levels=rev(c("Single copy BUSCOs",
+                                                                "Multi copy BUSCOs",
+                                                                "Fragmented BUSCOs",
+                                                                "Missing BUSCOs"))) 
+
+  
+  busco_values$mode <- basename(dirname(file))
+  busco_values$lineage <- busco$lineage_dataset$name
+
+  busco_values$summary <- busco$results$one_line_summary
+  
+  busco_values
+}
+
+files <- list.files(busco_folder, pattern = "short_summary\\..*\\.json$", full.names = TRUE, recursive = T)
+
+busco_values <- bind_rows(lapply(files, read_busco))
+```
+
+```{r busco_plot}
+ggplotly(ggplot(busco_values, aes(y=pct, x=mode, label=summary, fill=BUSCO)) + 
+  geom_bar(stat="identity") + coord_flip() + facet_wrap(~lineage))
+```
 
 
 ```{r benchmark, results='asis', echo=FALSE, eval=has_benchmark}
