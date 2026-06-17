@@ -1,6 +1,6 @@
 name: scallop
 channels:
+  - conda-forge
   - bioconda
 dependencies:
   - scallop2
-  - stringtie 

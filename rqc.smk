@@ -529,7 +529,7 @@ rule assembly:
         runtime=360,
         nodes=1,
         cpus_per_task=12
-    conda: "envs/scallop.yaml"
+    conda: "envs/stringtie.yaml"
     shell: """
            USEREF=""
            [ -e "{wildcards.plant}/reference/annotation.gtf" ] && USEREF="-G {wildcards.plant}/reference/annotation.gtf"
@@ -605,7 +605,7 @@ rule sort_bam:
     shell: """
             samtools sort -m 5G -@ {threads} -o {output} {input}
 
-            samtools index {output}
+            samtools index {output} || samtools index -c {output}
             """
 
 
@@ -649,7 +649,7 @@ rule star_index:
                 --runThreadN {threads} \
                 --runMode genomeGenerate \
                 --genomeFastaFiles {input.genome} \
-                --sjdbGTFfile $USEREF \
+                $USEREF \
                 --sjdbOverhang 257 \
                 --limitGenomeGenerateRAM 256000000000 \
                 --outTmpDir {wildcards.plant}/STARtmp \
