@@ -113,7 +113,7 @@ get_counts_from_salmon <- function() {
         index_dir    <- file.path(getwd(), "results/index/salmon")
         fasta_path   <- file.path(getwd(), "reference/genome.fa")
         t_fasta_path <- file.path(getwd(), "reference/transcripts.fa")
-        gtf_path     <- file.path(getwd(), "reference/annotation.gtf")
+        gtf_path     <- file.path(getwd(), "reference/transcripts.gtf")
         
         if (!dir.exists(bcf_dir)) {
             dir.create(bcf_dir)
