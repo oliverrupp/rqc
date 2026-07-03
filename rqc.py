@@ -21,7 +21,6 @@ import psutil
 import subprocess
 import logging
 from pathlib import Path
-import shlex
 
 
 SALMON_MEMORY_USAGE_FACTOR = 13
@@ -362,8 +361,6 @@ class RQCPipeline:
         """Execute the Snakemake command."""
         logger.info(f"Executing: {' '.join(cmd)}")
 
-        print(shlex.join(cmd))
-        
         try:
             result = subprocess.run(
                 cmd,
