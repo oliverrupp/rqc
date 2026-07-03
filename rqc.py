@@ -21,7 +21,7 @@ import psutil
 import subprocess
 import logging
 from pathlib import Path
-from typing import List, Optional, Set
+import shlex
 
 
 SALMON_MEMORY_USAGE_FACTOR = 13
@@ -69,7 +69,7 @@ class RQCValidator:
         return True
 
     
-    def find_organisms(self, verbose: bool = True) -> Set[str]:
+    def find_organisms(self, verbose: bool = True) -> set[str]:
         """Find all valid organism directories."""
         organisms = set()
         
@@ -145,7 +145,7 @@ class RQCValidator:
                 
         return True
     
-    def get_sample_names(self, organism: str) -> List[str]:
+    def get_sample_names(self, organism: str) -> list[str]:
         """Return sample TSV filenames for an organism."""
         return sorted(f.name for f in self.get_sample_files(self.project_dir / organism)
     )
@@ -168,7 +168,7 @@ class RQCValidator:
 
         return valid_samples
 
-    def get_report_targets(self, organisms: Optional[List[str]] = None) -> List[str]:
+    def get_report_targets(self, organisms: list[str] | None = None) -> list[str]:
         """Return report targets for all samples*.tsv files."""
 
         targets = []
@@ -262,7 +262,7 @@ class RQCPipeline:
         return True
     
     @staticmethod
-    def validate_hpc_config(hpc_config: Optional[Path]) -> bool:
+    def validate_hpc_config(hpc_config: Path | None) -> bool:
         """Validate that HPC config file exists if provided."""
         if hpc_config:
             if not hpc_config.exists():
@@ -283,12 +283,12 @@ class RQCPipeline:
         rerun_incomplete: bool,
         assembly: bool,
         keep_going: bool,
-        executor: Optional[str] = None,
-        hpc_config: Optional[Path] = None,
-        organisms: Optional[List[str]] = None,
-        busco: Optional[str] = None,
-        config_file: Optional[Path] = None
-    ) -> List[str]:
+        executor: str | None = None,
+        hpc_config: Path | None = None,
+        organisms: list[str] | None = None,
+        busco: str | None = None,
+        config_file: Path | None = None
+    ) -> list[str]:
         """Build the Snakemake command with all options (Snakemake 9 compatible)."""
         cmd = ["snakemake", "--benchmark-extended", "-s", str(self.snakemake_file)]
         
@@ -346,22 +346,23 @@ class RQCPipeline:
         targets = validator.get_report_targets(organisms)
         cmd.extend(targets)
 
+        cmd.extend(["--resources", f"mem_mb={max_memory}"])
 
         use_assembly = "true" if assembly else "false"
 
-        busco_str = f"busco={busco}" if not busco is None else ""
+        configs = ["--config", f"max_mem_mb={max_memory}", f"use_assembly={use_assembly}"]
 
-        cmd.extend(["--resources", f"mem_mb={max_memory}"])
+        configs.append(f"busco={busco}") if not busco is None else None
 
-        cmd.extend(["--config", busco_str,
-                                f"max_mem_mb={max_memory}",
-                                f"use_assembly={use_assembly}"])
+        cmd.extend(configs)
 
         return cmd
     
-    def run_snakemake(self, cmd: List[str]) -> int:
+    def run_snakemake(self, cmd: list[str]) -> int:
         """Execute the Snakemake command."""
         logger.info(f"Executing: {' '.join(cmd)}")
+
+        print(shlex.join(cmd))
         
         try:
             result = subprocess.run(
