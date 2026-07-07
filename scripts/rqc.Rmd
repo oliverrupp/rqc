@@ -121,9 +121,13 @@ val_idx <- which(colnames(summary_df) %in% column_vals)
 target_idx <- which(colnames(summary_df) %in% column_names)
 
 dt <- datatable(summary_df, class = "cell-border compact",
-                options = list(pageLength = 50,
-                               columnDefs = list(list(visible = FALSE,
-                                                      targets = val_idx)))) |>
+                extensions = "Buttons",
+                options = list(
+                    dom = "Bfrtip",
+                    buttons = c("copy", "csv", "excel"),
+                    pageLength = 50,
+                    columnDefs = list(list(visible = FALSE,
+                                           targets = val_idx)))) |>
     formatStyle(0, fontWeight = "bold")
 
 for(coln in column_names) {
@@ -260,7 +264,7 @@ metric_df <- complexity_df |>
                   "top_100_transcripts", "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
 column_names <- c("fragment_length", "mapping_rate", "top_100_transcripts", 
                   "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
-datatable(metric_df, options = list(pageLength = 50)) |> formatRound(columns = column_names, digits = 2)
+datatable(metric_df, extensions = "Buttons", options = list(dom = "Bfrtip", buttons = c("copy", "csv", "excel"), pageLength = 50)) |> formatRound(columns = column_names, digits = 2)
 ```
 
 
@@ -734,8 +738,10 @@ busco_values <- bind_rows(lapply(files, read_busco))
 ```
 
 ```{r busco_plot}
-ggplotly(ggplot(busco_values, aes(y=pct, x=mode, label=summary, fill=BUSCO)) + 
-  geom_bar(stat="identity") + coord_flip() + facet_wrap(~lineage))
+if(nrow(busco_values) > 0) {
+    ggplotly(ggplot(busco_values, aes(y=pct, x=mode, label=summary, fill=BUSCO)) + 
+             geom_bar(stat="identity") + coord_flip() + facet_wrap(~lineage))
+}
 ```
 
 
