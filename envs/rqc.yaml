@@ -5,3 +5,4 @@ channels:
 dependencies:
   - snakemake
   - snakemake-executor-plugin-slurm
+  - fastq-dl=4.0.1
