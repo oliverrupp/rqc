@@ -13,10 +13,12 @@ Example:
     rqc.py --hpc slurm --max-jobs 10 --hpc-config hpc_config.yaml
     rqc.py --list-organisms
     rqc.py /path/to/project -no-conda
+    rqc.py download samples.tsv --tmpdir /custom/tmp -v
 """
 
 import argparse
 import sys
+import os
 import psutil
 import subprocess
 import logging
@@ -382,7 +384,17 @@ def parse_arguments() -> argparse.Namespace:
         """
     )
     
-    parser.add_argument(
+    # Create subparsers for commands
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Main pipeline command (default, no subcommand required)
+    pipeline_parser = subparsers.add_parser(
+        None,
+        help="Run the RQC pipeline (default command)",
+        add_help=False
+    )
+    
+    pipeline_parser.add_argument(
         "project_dir",
         nargs="?",
         default=None,
@@ -391,14 +403,14 @@ def parse_arguments() -> argparse.Namespace:
 
     
     # just validate
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "-v", "--validate",
         action="store_true",
         help="Validate the project folder and all subfolders"
     )
     
     # List organisms option
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "-l", "--list-organisms",
         action="store_true",
         help="List all valid organisms and exit\n\n"
@@ -406,7 +418,7 @@ def parse_arguments() -> argparse.Namespace:
 
     
     # Organisms
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "-o", "--organism",
         type=str,
         help="Comma-separated list of organisms to run (default: all)\n\n"
@@ -414,7 +426,7 @@ def parse_arguments() -> argparse.Namespace:
     
     
     # force assembly if GTF is missing
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "--assembly",
         action="store_true",
         help="Run de-novo genome-guided assembly\nExtends reference annotation if available\n   (default: user provided GTF file)\n\n"
@@ -422,7 +434,7 @@ def parse_arguments() -> argparse.Namespace:
 
     
     # set BUSCO lieage
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "--busco",
         type=str,
         metavar="LINEAGE",
@@ -431,7 +443,7 @@ def parse_arguments() -> argparse.Namespace:
 
     
     # Conda
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "--no-conda",
         action="store_true",
         help="Do not use conda environments (default: use conda)\n\n"
@@ -439,21 +451,21 @@ def parse_arguments() -> argparse.Namespace:
 
 
     # Resource options
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "--max-cpus",
         type=int,
         default=8,
         help="Maximum CPUs for local execution (default: 8)"
     )
 
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "--max-jobs",
         type=int,
         default=100,
         help="Maximum parallel jobs for HPC execution (default: 100)"
     )
 
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "--max-memory",
         type=int,
         default=16000,
@@ -463,7 +475,7 @@ def parse_arguments() -> argparse.Namespace:
 
     
     # HPC execution (optional - defaults to local if not specified)
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "--hpc",
         type=str,
         metavar="EXECUTOR",
@@ -471,7 +483,7 @@ def parse_arguments() -> argparse.Namespace:
     )
         
     # HPC-specific options
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "--hpc-config",
         type=Path,
         help="Snakemake HPC profile/config file (YAML format)\n\n"
@@ -480,34 +492,93 @@ def parse_arguments() -> argparse.Namespace:
     
     
     # Dry run
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "-n", "--dry-run",
         action="store_true",
         help="Perform a dry run without executing jobs"
     )
 
     # rerun incomplete
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "-r", "--rerun-incomplete",
         action="store_true",
         help="Rerun incomplete jobs"
     )
 
     # keep going
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "-k", "--keep-going",
         action="store_true",
         help="Keep going if jobs fail"
     )
 
     # Config file
-    parser.add_argument(
+    pipeline_parser.add_argument(
         "--config",
         type=Path,
         help="Snakemake config file (YAML format)"
     )
     
+    # Download subcommand
+    download_parser = subparsers.add_parser(
+        "download",
+        help="Download fastq files from ENA using SRR IDs"
+    )
+    
+    download_parser.add_argument(
+        "sample_file",
+        help="TSV file containing sample data with 'sample' column containing SRR IDs"
+    )
+    
+    download_parser.add_argument(
+        "--tmpdir",
+        default="/tmp",
+        help="Temporary directory for fastq-dl to use (default: /tmp)"
+    )
+    
+    download_parser.add_argument(
+        "--project-dir",
+        default=None,
+        help="Project directory (default: auto-detect from sample_file path)"
+    )
+    
+    download_parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Enable verbose output"
+    )
+    
     return parser.parse_args()
+
+
+def run_download(args) -> int:
+    """Handle the download subcommand."""
+    script_dir = Path(__file__).parent
+    download_script = script_dir / "scripts" / "download_ena.py"
+    
+    if not download_script.exists():
+        logger.error(f"Download script not found: {download_script}")
+        return 1
+    
+    # Build command for download_ena.py
+    cmd = ["python", str(download_script), args.sample_file]
+    
+    cmd.extend(["--tmpdir", args.tmpdir])
+    
+    if args.project_dir:
+        cmd.extend(["--project-dir", args.project_dir])
+    
+    if args.verbose:
+        cmd.append("--verbose")
+    
+    logger.info(f"Executing: {' '.join(cmd)}")
+    
+    try:
+        result = subprocess.run(cmd)
+        return result.returncode
+    except Exception as e:
+        logger.error(f"Error running download script: {e}")
+        return 1
 
 
 def list_organisms(project_dir: Path, assembly: bool=False) -> int:
@@ -566,6 +637,10 @@ def main():
     """Main entry point."""
     args = parse_arguments()
 
+    # Handle download subcommand
+    if args.command == "download":
+        return run_download(args)
+    
     # Get script directory
     script_dir = Path(__file__).parent
     
@@ -686,4 +761,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
