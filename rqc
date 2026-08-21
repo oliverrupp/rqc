@@ -104,4 +104,10 @@ fi
 # Run wrapper
 ###############################################################################
 
+args="pipeline download"
+
+if ! [[ " $args " == *" $1 "* ]] ; then
+    set -- "pipeline" "$@"
+fi
+
 exec python "${RQC_PY}" "$@"
