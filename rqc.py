@@ -387,11 +387,11 @@ def parse_arguments() -> argparse.Namespace:
     # Create subparsers for commands
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
-    # Main pipeline command (default, no subcommand required)
+    # Pipeline command (when no subcommand is specified)
     pipeline_parser = subparsers.add_parser(
-        None,
-        help="Run the RQC pipeline (default command)",
-        add_help=False
+        "pipeline",
+        help="Run the RQC pipeline (default)",
+        add_help=True
     )
     
     pipeline_parser.add_argument(
@@ -522,7 +522,8 @@ def parse_arguments() -> argparse.Namespace:
     # Download subcommand
     download_parser = subparsers.add_parser(
         "download",
-        help="Download fastq files from ENA using SRR IDs"
+        help="Download fastq files from ENA using SRR IDs",
+        add_help=True
     )
     
     download_parser.add_argument(
@@ -640,6 +641,10 @@ def main():
     # Handle download subcommand
     if args.command == "download":
         return run_download(args)
+    
+    # If no command specified and first arg looks like a project dir, assume pipeline command
+    if args.command is None:
+        args.command = "pipeline"
     
     # Get script directory
     script_dir = Path(__file__).parent
