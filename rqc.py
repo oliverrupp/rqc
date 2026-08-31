@@ -93,7 +93,7 @@ class RQCValidator:
             if verbose:
                 logger.error(f"No valid organisms found in {self.project_dir}")
                 logger.error(f"Organisms must contain: {self.REQUIRED_GENOME_FILE}, "
-                             f"{self.REQUIRED_ANNOTATION_GFF3_FILE} or {self.REQUIRED_ANNOTATION_GFF3_FILE}, {self.REQUIRED_SAMPLES_FILE}, "
+                             f"{self.REQUIRED_ANNOTATION_GTF_FILE} or {self.REQUIRED_ANNOTATION_GFF3_FILE}, {self.REQUIRED_SAMPLES_FILE}, "
                              f"and reads files")
             return set()
 
@@ -165,7 +165,7 @@ class RQCValidator:
                 valid_samples.add(sample_file)
 
         if not valid_samples:
-            logger.error("No invalid sample file found")
+            logger.error("No valid sample file found")
 
         return valid_samples
 

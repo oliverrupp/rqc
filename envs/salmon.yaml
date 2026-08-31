@@ -2,4 +2,4 @@ name: salmon
 channels:
   - bioconda
 dependencies:
-  - salmon
+  - salmon=1.10.3

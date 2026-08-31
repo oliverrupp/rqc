@@ -2,4 +2,4 @@ name: gffread
 channels:
   - bioconda
 dependencies:
-  - gffread
+  - gffread=0.12.9
