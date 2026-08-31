@@ -13,7 +13,7 @@ All other software dependencies are installed automatically by the `rqc` script.
 Clone the repository:
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/oliverrupp/rqc.git
 cd rqc
 ```
 
