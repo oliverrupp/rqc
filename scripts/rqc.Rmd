@@ -125,7 +125,7 @@ dt <- datatable(summary_df, class = "cell-border compact",
                 options = list(
                     dom = "Bfrtip",
                     buttons = c("copy", "csv", "excel"),
-                    pageLength = 50,
+                    pageLength = 100,
                     columnDefs = list(list(visible = FALSE,
                                            targets = val_idx)))) |>
     formatStyle(0, fontWeight = "bold")
