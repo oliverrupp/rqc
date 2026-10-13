@@ -339,7 +339,7 @@ rule salmon_se:
 		      --allowDovetail \
 		      -p {threads} \
 		      -o {wildcards.plant}/results/salmon/{wildcards.sample} \
-            -r {input[0]} -i {wildcards.plant}/results/index/salmon"
+            -r {input[0]} -i {wildcards.plant}/results/index/salmon
            """
 
 
