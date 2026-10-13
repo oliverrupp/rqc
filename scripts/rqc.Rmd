@@ -364,7 +364,7 @@ jhm
 ```
 
 
-
+<!--
 ### **PCA**
 
 ```{r pca}
@@ -385,6 +385,51 @@ ggplotly(ggplot(scores, aes(x = PC2, y = PC1, color = condition, label = sample,
              x = paste0("PC2 [", round(variance["PC2"], 1), "%]")
          ))
 ```
+-->
+
+
+```{r setup-pca, include=FALSE}
+library(dplyr)
+library(ggplot2)
+library(plotly)
+
+sample_names <- rownames(pca_data_df)
+sample_names <- sample_names[sample_names != "__VAR"]
+variance <- pca_data_df["__VAR", , drop = FALSE]
+
+# dummy widget so plotly's JS/CSS dependencies get attached to the page
+htmltools::tagList(ggplotly(ggplot()))
+```
+
+```{r pca-tabs, results='asis'}
+tpl <- c(
+  "### PCA by `r col`",
+  "",
+  "```{r}",
+  "scores <- pca_data_df[sample_names, ] |>",
+  "  mutate(condition = samples_df[sample_names, col],",
+  "         outlier = pca_df[sample_names, 'norm_influence'],",
+  "         is_outlier = pca_df[sample_names, 'is_outlier'],",
+  "         sample = sample_names)",
+  "",
+  "p <- ggplot(scores, aes(x = PC2, y = PC1, color = condition,",
+  "                        label = sample, size = outlier)) +",
+  "  geom_point() +",
+  "  labs(y = paste0('PC1 [', round(variance[['PC1']], 1), '%]'),",
+  "       x = paste0('PC2 [', round(variance[['PC2']], 1), '%]'),",
+  "       color = col)",
+  "ggplotly(p)",
+  "```",
+  ""
+)
+
+out <- lapply(colnames(samples_df), function(col) {
+  knitr::knit_child(text = tpl, envir = environment(), quiet = TRUE)
+})
+cat(unlist(out), sep = "\n")
+```
+
+
 
 
 ### **PC Pairs**
