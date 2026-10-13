@@ -476,9 +476,13 @@ for(batch in colnames(samples_df)[!(colnames(samples_df) %in% "condition")]) {
     compl <- append(compl, batchs)
 }
 
-ggplotly(ggplot(pcm, aes(x = value, y = rot, label=sample)) + geom_boxplot() + geom_jitter(width = 0.2) +
-         facet_grid(PC~name, scale = "free_x") + xlab("") + ylab("") + 
-         theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)))
+pcm$condition = samples_df[pcm$sample, ]$condition
+
+ggplotly(ggplot(pcm, aes(x = value, y = rot, col=condition, label=sample)) + geom_boxplot(col="black") + 
+           geom_jitter(size = 0.75, width = 0.2) +
+           facet_grid(PC~name, scale = "free_x") + xlab("") + ylab("") + 
+           theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)))
+
 ```
 
 
