@@ -627,11 +627,11 @@ condition_pca <- function() {
             
             if (nrow(pcs) < 2) { return(data.frame(factor = fac, name = cond, qc_score = 0)) }
             
-            centroid <- apply(pcs, 2, median)
+            centroid <- apply(pcs, 2, mean)
             
             d <- apply(pcs, 1, function(x) { sqrt(sum((x - centroid)^2)) })
             
-            data.frame(factor = fac, name = cond, qc_score = median(d))
+            data.frame(factor = fac, name = cond, qc_score = mean(d))
         }))
     }))
     
