@@ -209,9 +209,11 @@ ra_df$Metric <- factor(ra_df$Metric,
                                       "Nreads", "TooShort",
                                       "TooLong", "LowQuality")))
 
-ra_df$Samples = factor(ra_df$Samples,
-                       levels=rownames(samples_df[order(samples_df$condition, rownames(samples_df)),,drop=FALSE]))
+# ra_df$Samples = factor(ra_df$Samples,
+#                       levels=rownames(samples_df[order(samples_df$condition, rownames(samples_df)),,drop=FALSE]))
 
+
+ra_df$Samples <- paste(samples_df[ra_df$Samples,]$condition, ra_df$Samples, sep=" : ")
 
 ggplotly(ggplot(ra_df, aes(x=Samples, y=Reads, fill=Metric)) + 
          geom_hline(yintercept=c(50e6)) + xlab("") + ylab("Number of Reads") + 
@@ -260,7 +262,7 @@ metric_df <- complexity_df |>
            effective_genes=exp(complexity_df$shannon_entropy),
            fragment_length=as.numeric(frag_len_df[rownames(complexity_df),,drop=FALSE]$mean_frag_est),
            mapping_rate=Assigned/TotalReads*100) |> 
-    dplyr::select("condition", "type", "orientation", "fragment_length", "mapping_rate", "detected_genes",
+    dplyr::select("condition", "type", "orientation", "fragment_length", "Assigned", "mapping_rate", "detected_genes",
                   "top_100_transcripts", "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
 column_names <- c("fragment_length", "mapping_rate", "top_100_transcripts", 
                   "Duprate", "normalized_AUC", "shannon_entropy", "effective_genes")
@@ -338,9 +340,11 @@ Column {.tabset}
 
 ```{r correlation heatmap}
 gene_variance <- apply(g_vst_df, 1, var)
-top_v_genes <- order(gene_variance, decreasing = TRUE)[1:5000]
+top_v_genes <- order(gene_variance, decreasing = TRUE)[1:2500]
 
-sample_cor <- cor(g_vst_df[top_v_genes,], method = "pearson", use = "pairwise.complete.obs")
+# sample_cor <- cor(g_vst_df[top_v_genes,], method = "pearson", use = "pairwise.complete.obs")
+sample_cor <- cor(g_vst_df[gene_variance >= 5,], method = "pearson", use = "pairwise.complete.obs")
+
 heatmaply(sample_cor,
           row_side_colors = samples_df,
           col_side_colors = samples_df,
@@ -452,7 +456,7 @@ ggplotly(ggpairs(
 
 
 ```{r batch pca, results='asis', echo=FALSE, eval=has_batch_factors}
-cat("\n\n### **PCA by batch factor**\n\n\n")
+cat("\n\n### **PC by batch factor**\n\n\n")
 ```
 
 
