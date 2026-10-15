@@ -320,10 +320,10 @@ library_complexity <- function() {
 
 
 
-##################### JACCARD TOP 1000 #########################################
+##################### JACCARD TOP 100 #########################################
 jaccard_similarity <- function() {
-    top_genes <- apply(g_count_matrix, 2, function(x) {
-        names(sort(x, decreasing=TRUE)[1:1000])
+    top_genes <- apply(g_TPM, 2, function(x) {
+        names(sort(x, decreasing=TRUE)[1:100])
     })
 
     samples <- colnames(top_genes)

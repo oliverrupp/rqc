@@ -343,7 +343,7 @@ gene_variance <- apply(g_vst_df, 1, var)
 top_v_genes <- order(gene_variance, decreasing = TRUE)[1:2500]
 
 # sample_cor <- cor(g_vst_df[top_v_genes,], method = "pearson", use = "pairwise.complete.obs")
-sample_cor <- cor(g_vst_df[gene_variance >= 5,], method = "pearson", use = "pairwise.complete.obs")
+sample_cor <- cor(g_vst_df[gene_variance >= 2,], method = "pearson", use = "pairwise.complete.obs")
 
 heatmaply(sample_cor,
           row_side_colors = samples_df,
@@ -352,7 +352,7 @@ heatmaply(sample_cor,
 ```
 
 
-### **Top 1000 Genes**
+### **Top 100 Genes**
 
 ```{r jaccard heatmap}
 jaccard_df <- jaccard_df[order(samples_df[rownames(jaccard_df),]$condition),order(samples_df[colnames(jaccard_df),]$condition)]
